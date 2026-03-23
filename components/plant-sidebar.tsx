@@ -1,83 +1,95 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Plant, PlantVariety } from "@/lib/plants"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { Plant, PlantVariety } from "@/lib/plants";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { Search, Leaf, ChevronDown, Clock, Settings } from "lucide-react"
+} from "@/components/ui/collapsible";
+import { Search, Leaf, ChevronDown, Clock, Settings } from "lucide-react";
 
 export interface SelectedPlantData {
-  plant: Plant
-  variety?: PlantVariety
+  plant: Plant;
+  variety?: PlantVariety;
 }
 
 interface PlantSidebarProps {
-  plants: Plant[]
-  onDragStart: (data: SelectedPlantData) => void
-  selectedPlant: SelectedPlantData | null
-  onSelectPlant: (data: SelectedPlantData | null) => void
-  onOpenManager: () => void
+  plants: Plant[];
+  onDragStart: (data: SelectedPlantData) => void;
+  selectedPlant: SelectedPlantData | null;
+  onSelectPlant: (data: SelectedPlantData | null) => void;
+  onOpenManager: () => void;
 }
 
-export function PlantSidebar({ 
+export function PlantSidebar({
   plants,
-  onDragStart, 
-  selectedPlant, 
+  onDragStart,
+  selectedPlant,
   onSelectPlant,
-  onOpenManager 
+  onOpenManager,
 }: PlantSidebarProps) {
-  const [search, setSearch] = useState("")
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [expandedPlants, setExpandedPlants] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [expandedPlants, setExpandedPlants] = useState<Set<string>>(new Set());
 
   const categories = [
-    { id: 'frutas', label: 'Frutas', color: 'bg-red-100 text-red-700' },
-    { id: 'verduras', label: 'Verduras', color: 'bg-green-100 text-green-700' },
-    { id: 'hierbas', label: 'Hierbas', color: 'bg-emerald-100 text-emerald-700' },
-    { id: 'legumbres', label: 'Legumbres', color: 'bg-amber-100 text-amber-700' },
-  ]
+    { id: "frutas", label: "Frutas", color: "bg-red-100 text-red-700" },
+    { id: "verduras", label: "Verduras", color: "bg-green-100 text-green-700" },
+    {
+      id: "hierbas",
+      label: "Hierbas",
+      color: "bg-emerald-100 text-emerald-700",
+    },
+    {
+      id: "legumbres",
+      label: "Legumbres",
+      color: "bg-amber-100 text-amber-700",
+    },
+  ];
 
-  const filteredPlants = plants.filter(plant => {
-    const matchesSearch = plant.name.toLowerCase().includes(search.toLowerCase()) ||
-      plant.varieties.some(v => v.name.toLowerCase().includes(search.toLowerCase()))
-    const matchesCategory = !activeCategory || plant.category === activeCategory
-    return matchesSearch && matchesCategory
-  })
+  const filteredPlants = plants.filter((plant) => {
+    const matchesSearch =
+      plant.name.toLowerCase().includes(search.toLowerCase()) ||
+      plant.varieties.some((v) =>
+        v.name.toLowerCase().includes(search.toLowerCase()),
+      );
+    const matchesCategory =
+      !activeCategory || plant.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const toggleExpanded = (plantId: string) => {
-    const newExpanded = new Set(expandedPlants)
+    const newExpanded = new Set(expandedPlants);
     if (newExpanded.has(plantId)) {
-      newExpanded.delete(plantId)
+      newExpanded.delete(plantId);
     } else {
-      newExpanded.add(plantId)
+      newExpanded.add(plantId);
     }
-    setExpandedPlants(newExpanded)
-  }
+    setExpandedPlants(newExpanded);
+  };
 
   const isSelected = (plantId: string, varietyId?: string) => {
-    if (!selectedPlant) return false
+    if (!selectedPlant) return false;
     if (varietyId) {
-      return selectedPlant.variety?.id === varietyId
+      return selectedPlant.variety?.id === varietyId;
     }
-    return selectedPlant.plant.id === plantId && !selectedPlant.variety
-  }
+    return selectedPlant.plant.id === plantId && !selectedPlant.variety;
+  };
 
   const handleSelect = (plant: Plant, variety?: PlantVariety) => {
-    const data: SelectedPlantData = { plant, variety }
-    const currentlySelected = isSelected(plant.id, variety?.id)
-    onSelectPlant(currentlySelected ? null : data)
-  }
+    const data: SelectedPlantData = { plant, variety };
+    const currentlySelected = isSelected(plant.id, variety?.id);
+    onSelectPlant(currentlySelected ? null : data);
+  };
 
   const handleDrag = (plant: Plant, variety?: PlantVariety) => {
-    onDragStart({ plant, variety })
-  }
+    onDragStart({ plant, variety });
+  };
 
   return (
     <div className="w-72 bg-card border-r border-border flex flex-col h-full overflow-hidden">
@@ -87,7 +99,12 @@ export function PlantSidebar({
             <Leaf className="h-5 w-5 text-primary" />
             <h2 className="font-semibold text-foreground">Plantas</h2>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenManager}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onOpenManager}
+          >
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -107,8 +124,10 @@ export function PlantSidebar({
           <Badge
             key={cat.id}
             variant={activeCategory === cat.id ? "default" : "secondary"}
-            className={`cursor-pointer text-xs ${activeCategory === cat.id ? '' : cat.color}`}
-            onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+            className={`cursor-pointer text-xs ${activeCategory === cat.id ? "" : cat.color}`}
+            onClick={() =>
+              setActiveCategory(activeCategory === cat.id ? null : cat.id)
+            }
           >
             {cat.label}
           </Badge>
@@ -128,15 +147,18 @@ export function PlantSidebar({
                   className={`
                     flex-1 flex items-center gap-3 p-2.5 rounded-lg cursor-grab active:cursor-grabbing
                     border transition-all duration-150
-                    ${isSelected(plant.id) 
-                      ? 'border-primary bg-primary/10 shadow-sm' 
-                      : 'border-transparent hover:bg-secondary hover:border-border'
+                    ${
+                      isSelected(plant.id)
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-transparent hover:bg-secondary hover:border-border"
                     }
                   `}
                 >
                   <span className="text-2xl select-none">{plant.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-foreground truncate">{plant.name}</p>
+                    <p className="font-medium text-sm text-foreground truncate">
+                      {plant.name}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{plant.spacingCm} cm</span>
                       <span className="flex items-center gap-0.5">
@@ -145,7 +167,7 @@ export function PlantSidebar({
                       </span>
                     </div>
                   </div>
-                  <div 
+                  <div
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: plant.color }}
                   />
@@ -158,11 +180,13 @@ export function PlantSidebar({
                     size="icon"
                     className="h-8 w-8 shrink-0"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      toggleExpanded(plant.id)
+                      e.stopPropagation();
+                      toggleExpanded(plant.id);
                     }}
                   >
-                    <ChevronDown className={`h-4 w-4 transition-transform ${expandedPlants.has(plant.id) ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${expandedPlants.has(plant.id) ? "rotate-180" : ""}`}
+                    />
                   </Button>
                 )}
               </div>
@@ -179,9 +203,10 @@ export function PlantSidebar({
                       className={`
                         flex items-center gap-2 p-2 rounded-md cursor-grab active:cursor-grabbing
                         border transition-all duration-150 text-sm
-                        ${isSelected(plant.id, variety.id) 
-                          ? 'border-primary bg-primary/10' 
-                          : 'border-transparent hover:bg-secondary hover:border-border'
+                        ${
+                          isSelected(plant.id, variety.id)
+                            ? "border-primary bg-primary/10"
+                            : "border-transparent hover:bg-secondary hover:border-border"
                         }
                       `}
                     >
@@ -217,5 +242,5 @@ export function PlantSidebar({
         </p>
       </div>
     </div>
-  )
+  );
 }

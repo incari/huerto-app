@@ -343,19 +343,11 @@ export function GardenCanvas({
       {/* Toolbar */}
       <div className="flex items-center justify-between p-3 border-b border-border bg-card">
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addLine}
-          >
+          <Button variant="outline" size="sm" onClick={addLine}>
             <Plus className="h-4 w-4 mr-1" />
             Linea
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={clearAll}
-          >
+          <Button variant="outline" size="sm" onClick={clearAll}>
             <RotateCcw className="h-4 w-4 mr-1" />
             Limpiar
           </Button>
@@ -396,10 +388,7 @@ export function GardenCanvas({
       </div>
 
       {/* Canvas */}
-      <div
-        className="flex-1 overflow-auto p-6"
-        ref={canvasRef}
-      >
+      <div className="flex-1 overflow-auto p-6" ref={canvasRef}>
         <div
           className="relative bg-amber-50/50 rounded-xl border-2 border-dashed border-amber-200"
           style={{
@@ -446,10 +435,7 @@ export function GardenCanvas({
               const groupData = lineGroups.find((g) => g.id === group.groupId);
 
               return (
-                <div
-                  key={group.groupId}
-                  className="relative"
-                >
+                <div key={group.groupId} className="relative">
                   {/* Group label */}
                   {groupData && (
                     <div className="absolute -left-16 top-0 bottom-0 flex items-center">

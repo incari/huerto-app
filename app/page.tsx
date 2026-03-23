@@ -92,10 +92,7 @@ export default function GardenPlannerPage() {
         <div className="flex items-center gap-2">
           <Dialog>
             <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-              >
+              <Button variant="outline" size="sm">
                 <Info className="h-4 w-4 mr-2" />
                 Ayuda
               </Button>
@@ -181,27 +178,18 @@ export default function GardenPlannerPage() {
           >
             <div className="border-b border-border bg-card px-4">
               <TabsList className="h-12">
-                <TabsTrigger
-                  value="garden"
-                  className="gap-2"
-                >
+                <TabsTrigger value="garden" className="gap-2">
                   <Layers className="h-4 w-4" />
                   Huerto
                 </TabsTrigger>
-                <TabsTrigger
-                  value="timeline"
-                  className="gap-2"
-                >
+                <TabsTrigger value="timeline" className="gap-2">
                   <Calendar className="h-4 w-4" />
                   Timeline
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent
-              value="garden"
-              className="flex-1 mt-0 overflow-hidden"
-            >
+            <TabsContent value="garden" className="flex-1 mt-0 overflow-hidden">
               <GardenCanvas
                 lines={lines}
                 plants={plants}
@@ -219,10 +207,7 @@ export default function GardenPlannerPage() {
               value="timeline"
               className="flex-1 mt-0 overflow-hidden"
             >
-              <PlantTimeline
-                lines={lines}
-                plants={plants}
-              />
+              <PlantTimeline lines={lines} plants={plants} />
             </TabsContent>
           </Tabs>
         </div>

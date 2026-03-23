@@ -314,10 +314,7 @@ export function PlantTimeline({
                               </span>
                             )}
                           </p>
-                          <Badge
-                            variant="outline"
-                            className="text-xs shrink-0"
-                          >
+                          <Badge variant="outline" className="text-xs shrink-0">
                             {group.items.length}
                           </Badge>
                         </div>

@@ -1,19 +1,30 @@
-"use client"
+"use client";
 
-import { GardenConfig, gardenMethods } from "@/lib/plants"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
-import { Settings, Droplets } from "lucide-react"
+import { GardenConfig, gardenMethods } from "@/lib/plants";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Settings, Droplets } from "lucide-react";
 
 interface ConfigPanelProps {
-  config: GardenConfig
-  onConfigChange: (config: GardenConfig) => void
-  plantCount: number
-  lineCount: number
+  config: GardenConfig;
+  onConfigChange: (config: GardenConfig) => void;
+  plantCount: number;
+  lineCount: number;
 }
 
-export function ConfigPanel({ config, onConfigChange, plantCount, lineCount }: ConfigPanelProps) {
+export function ConfigPanel({
+  config,
+  onConfigChange,
+  plantCount,
+  lineCount,
+}: ConfigPanelProps) {
   return (
     <div className="w-64 bg-card border-l border-border p-4 space-y-6">
       <div className="flex items-center gap-2">
@@ -26,9 +37,9 @@ export function ConfigPanel({ config, onConfigChange, plantCount, lineCount }: C
           <Label className="text-sm">Método de cultivo</Label>
           <Select
             value={config.method}
-            onValueChange={(value: GardenConfig['method']) => {
-              const newConfig = gardenMethods[value]
-              onConfigChange(newConfig)
+            onValueChange={(value: GardenConfig["method"]) => {
+              const newConfig = gardenMethods[value];
+              onConfigChange(newConfig);
             }}
           >
             <SelectTrigger>
@@ -60,11 +71,15 @@ export function ConfigPanel({ config, onConfigChange, plantCount, lineCount }: C
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <Label className="text-sm">Separación entre líneas</Label>
-            <span className="text-sm text-muted-foreground">{config.lineSeparationCm} cm</span>
+            <span className="text-sm text-muted-foreground">
+              {config.lineSeparationCm} cm
+            </span>
           </div>
           <Slider
             value={[config.lineSeparationCm]}
-            onValueChange={([value]) => onConfigChange({ ...config, lineSeparationCm: value })}
+            onValueChange={([value]) =>
+              onConfigChange({ ...config, lineSeparationCm: value })
+            }
             min={15}
             max={80}
             step={5}
@@ -75,11 +90,15 @@ export function ConfigPanel({ config, onConfigChange, plantCount, lineCount }: C
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <Label className="text-sm">Largo de línea</Label>
-            <span className="text-sm text-muted-foreground">{config.defaultLineLengthCm} cm</span>
+            <span className="text-sm text-muted-foreground">
+              {config.defaultLineLengthCm} cm
+            </span>
           </div>
           <Slider
             value={[config.defaultLineLengthCm]}
-            onValueChange={([value]) => onConfigChange({ ...config, defaultLineLengthCm: value })}
+            onValueChange={([value]) =>
+              onConfigChange({ ...config, defaultLineLengthCm: value })
+            }
             min={100}
             max={600}
             step={50}
@@ -104,25 +123,30 @@ export function ConfigPanel({ config, onConfigChange, plantCount, lineCount }: C
 
       <div className="pt-4 border-t border-border">
         <div className="bg-muted rounded-lg p-3">
-          <h4 className="text-xs font-medium text-foreground mb-2">Sobre el método</h4>
-          {config.method === 'parades-crestall' && (
+          <h4 className="text-xs font-medium text-foreground mb-2">
+            Sobre el método
+          </h4>
+          {config.method === "parades-crestall" && (
             <p className="text-xs text-muted-foreground">
-              El método Parades en Crestall utiliza bancales elevados con líneas de goteo separadas 30cm. 
-              Ideal para huertos urbanos y cultivo intensivo.
+              El método Parades en Crestall utiliza bancales elevados con líneas
+              de goteo separadas 30cm. Ideal para huertos urbanos y cultivo
+              intensivo.
             </p>
           )}
-          {config.method === 'traditional' && (
+          {config.method === "traditional" && (
             <p className="text-xs text-muted-foreground">
-              Método tradicional con surcos más espaciados (50cm) para facilitar el paso y el mantenimiento.
+              Método tradicional con surcos más espaciados (50cm) para facilitar
+              el paso y el mantenimiento.
             </p>
           )}
-          {config.method === 'intensive' && (
+          {config.method === "intensive" && (
             <p className="text-xs text-muted-foreground">
-              Cultivo intensivo con líneas muy juntas (20cm) para maximizar la producción en espacios pequeños.
+              Cultivo intensivo con líneas muy juntas (20cm) para maximizar la
+              producción en espacios pequeños.
             </p>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
