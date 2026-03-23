@@ -14,7 +14,14 @@ import {
   defaultPlants,
   LineGroup,
 } from "@/lib/plants";
-import { Sprout, Info, Layers, Calendar } from "lucide-react";
+import {
+  Sprout,
+  Info,
+  Layers,
+  Calendar,
+  Menu,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -25,6 +32,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export default function GardenPlannerPage() {
   const [selectedPlant, setSelectedPlant] = useState<SelectedPlantData | null>(
@@ -33,10 +46,11 @@ export default function GardenPlannerPage() {
   const [config, setConfig] = useState<GardenConfig>(
     gardenMethods["parades-crestall"],
   );
-  const [scale, setScale] = useState(1);
   const [plants, setPlants] = useState<Plant[]>(defaultPlants);
   const [managerOpen, setManagerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("garden");
+  const [plantSidebarOpen, setPlantSidebarOpen] = useState(false);
+  const [configPanelOpen, setConfigPanelOpen] = useState(false);
 
   const [lineGroups, setLineGroups] = useState<LineGroup[]>([
     { id: "group-1", name: "Bancal 1", color: "#22c55e" },
@@ -75,24 +89,44 @@ export default function GardenPlannerPage() {
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-            <Sprout className="h-6 w-6 text-primary" />
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Mobile menu button for plants */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setPlantSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+
+          <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10">
+            <Sprout className="h-5 w-5 md:h-6 md:w-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-foreground">
+            <h1 className="font-bold text-sm md:text-lg text-foreground">
               Planificador de Huerto
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground hidden sm:block">
               Diseña tu huerto con líneas de goteo
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Mobile config button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setConfigPanelOpen(true)}
+          >
+            <SettingsIcon className="h-5 w-5" />
+          </Button>
+
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="hidden sm:flex">
                 <Info className="h-4 w-4 mr-2" />
                 Ayuda
               </Button>
@@ -161,20 +195,46 @@ export default function GardenPlannerPage() {
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        <PlantSidebar
-          plants={plants}
-          onDragStart={handleDragStart}
-          selectedPlant={selectedPlant}
-          onSelectPlant={setSelectedPlant}
-          onOpenManager={() => setManagerOpen(true)}
-        />
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Mobile Plant Sidebar - Sheet/Drawer */}
+        <Sheet open={plantSidebarOpen} onOpenChange={setPlantSidebarOpen}>
+          <SheetContent
+            side="left"
+            className="p-0 w-80 sm:w-96"
+            aria-describedby="plant-sidebar-description"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Plantas</SheetTitle>
+              <p id="plant-sidebar-description" className="sr-only">
+                Selecciona plantas para añadir a tu huerto
+              </p>
+            </SheetHeader>
+            <PlantSidebar
+              plants={plants}
+              onDragStart={handleDragStart}
+              selectedPlant={selectedPlant}
+              onSelectPlant={setSelectedPlant}
+              onOpenManager={() => setManagerOpen(true)}
+            />
+          </SheetContent>
+        </Sheet>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Desktop Plant Sidebar */}
+        <div className="hidden lg:block">
+          <PlantSidebar
+            plants={plants}
+            onDragStart={handleDragStart}
+            selectedPlant={selectedPlant}
+            onSelectPlant={setSelectedPlant}
+            onOpenManager={() => setManagerOpen(true)}
+          />
+        </div>
+
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
           >
             <div className="border-b border-border bg-card px-4">
               <TabsList className="h-12">
@@ -189,7 +249,10 @@ export default function GardenPlannerPage() {
               </TabsList>
             </div>
 
-            <TabsContent value="garden" className="flex-1 mt-0 overflow-hidden">
+            <TabsContent
+              value="garden"
+              className="flex-1 min-h-0 mt-0 overflow-hidden"
+            >
               <GardenCanvas
                 lines={lines}
                 plants={plants}
@@ -198,26 +261,49 @@ export default function GardenPlannerPage() {
                 onLineGroupsChange={setLineGroups}
                 selectedPlant={selectedPlant}
                 config={config}
-                scale={scale}
-                onScaleChange={setScale}
               />
             </TabsContent>
 
             <TabsContent
               value="timeline"
-              className="flex-1 mt-0 overflow-hidden"
+              className="flex-1 min-h-0 mt-0 overflow-hidden"
             >
               <PlantTimeline lines={lines} plants={plants} />
             </TabsContent>
           </Tabs>
         </div>
 
-        <ConfigPanel
-          config={config}
-          onConfigChange={setConfig}
-          plantCount={plantCount}
-          lineCount={lines.length}
-        />
+        {/* Mobile Config Panel - Sheet/Drawer */}
+        <Sheet open={configPanelOpen} onOpenChange={setConfigPanelOpen}>
+          <SheetContent
+            side="right"
+            className="p-0 w-80"
+            aria-describedby="config-panel-description"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Configuración</SheetTitle>
+              <p id="config-panel-description" className="sr-only">
+                Configura el método de cultivo y espaciamiento
+              </p>
+            </SheetHeader>
+            <ConfigPanel
+              config={config}
+              onConfigChange={setConfig}
+              plantCount={plantCount}
+              lineCount={lines.length}
+            />
+          </SheetContent>
+        </Sheet>
+
+        {/* Desktop Config Panel */}
+        <div className="hidden lg:block">
+          <ConfigPanel
+            config={config}
+            onConfigChange={setConfig}
+            plantCount={plantCount}
+            lineCount={lines.length}
+          />
+        </div>
       </div>
 
       {/* Plant Manager Dialog */}

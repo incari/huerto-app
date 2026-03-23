@@ -12,7 +12,7 @@ import {
 } from "@/lib/plants";
 import { SelectedPlantData } from "@/components/plant-sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, ZoomIn, ZoomOut, RotateCcw, Minus } from "lucide-react";
+import { Plus, Trash2, RotateCcw, Minus } from "lucide-react";
 
 interface GardenCanvasProps {
   lines: GardenLine[];
@@ -22,8 +22,6 @@ interface GardenCanvasProps {
   onLineGroupsChange: (groups: LineGroup[]) => void;
   selectedPlant: SelectedPlantData | null;
   config: GardenConfig;
-  scale: number;
-  onScaleChange: (scale: number) => void;
 }
 
 const PIXELS_PER_CM = 2;
@@ -36,13 +34,12 @@ export function GardenCanvas({
   onLineGroupsChange,
   selectedPlant,
   config,
-  scale,
-  onScaleChange,
 }: GardenCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [dragOverLine, setDragOverLine] = useState<number | null>(null);
   const [dragPosition, setDragPosition] = useState<number | null>(null);
   const [dragSide, setDragSide] = useState<"top" | "bottom">("top");
+  const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
 
   const getPlantById = (id: string) => plants.find((p) => p.id === id);
 
@@ -145,7 +142,7 @@ export function GardenCanvas({
       const variety = data.variety;
       const line = lines[lineIndex];
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale;
+      const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       const lineMiddle = rect.height / 2;
       const side: "top" | "bottom" = y < lineMiddle ? "top" : "bottom";
@@ -180,7 +177,7 @@ export function GardenCanvas({
         onLinesChange(newLines);
       }
     },
-    [lines, onLinesChange, scale, plants],
+    [lines, onLinesChange, plants],
   );
 
   const handleDragOver = useCallback(
@@ -188,13 +185,13 @@ export function GardenCanvas({
       e.preventDefault();
       setDragOverLine(lineIndex);
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale;
+      const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       const lineMiddle = rect.height / 2;
       setDragPosition(Math.round(x / PIXELS_PER_CM));
       setDragSide(y < lineMiddle ? "top" : "bottom");
     },
-    [scale],
+    [],
   );
 
   const handleLineClick = useCallback(
@@ -203,7 +200,7 @@ export function GardenCanvas({
 
       const line = lines[lineIndex];
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale;
+      const x = e.clientX - rect.left;
       const positionCm = x / PIXELS_PER_CM;
 
       const validPosition = findNextValidPosition(
@@ -235,7 +232,7 @@ export function GardenCanvas({
         onLinesChange(newLines);
       }
     },
-    [lines, onLinesChange, selectedPlant, scale, plants],
+    [lines, onLinesChange, selectedPlant, plants],
   );
 
   const removePlant = useCallback(
@@ -338,8 +335,35 @@ export function GardenCanvas({
     return groups;
   }, [lines]);
 
+  // Calculate total canvas height
+  const canvasHeightPx = useMemo(() => {
+    if (lines.length === 0) return 200;
+
+    // Calculate height based on actual line heights
+    let totalHeight = 0;
+    lines.forEach((_, index) => {
+      const spacing = getLineSpacing(index);
+      // Add the height of each line (intraGroupSpacingCm)
+      totalHeight += spacing.height;
+    });
+
+    // Add group separators (between actual groups, not calculated groups)
+    const numGroups = groupedLines.length;
+    const numSeparators = numGroups > 1 ? numGroups - 1 : 0;
+    if (numSeparators > 0 && config.groupConfig?.interGroupSpacingCm) {
+      totalHeight +=
+        numSeparators * config.groupConfig.interGroupSpacingCm * PIXELS_PER_CM;
+    }
+
+    const padding = config.groupConfig?.paddingCm
+      ? config.groupConfig.paddingCm * PIXELS_PER_CM * 2
+      : 80;
+    // Add ruler space (pt-10 = 40px) + small bottom margin
+    return totalHeight + padding + 40 + 20;
+  }, [lines, config, groupedLines]);
+
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col bg-background overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-3 border-b border-border bg-card">
         <div className="flex items-center gap-2">
@@ -364,37 +388,15 @@ export function GardenCanvas({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onScaleChange(Math.max(0.5, scale - 0.25))}
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground w-16 text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onScaleChange(Math.min(2, scale + 0.25))}
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 overflow-auto p-6" ref={canvasRef}>
+      <div className="min-h-0 overflow-auto p-6 flex-1" ref={canvasRef}>
         <div
           className="relative bg-amber-50/50 rounded-xl border-2 border-dashed border-amber-200"
           style={{
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
             width: canvasWidthPx,
+            height: canvasHeightPx,
             paddingTop: config.groupConfig?.paddingCm
               ? config.groupConfig.paddingCm * PIXELS_PER_CM
               : 40,
@@ -463,7 +465,13 @@ export function GardenCanvas({
                       <div key={line.id}>
                         <div
                           className="relative group"
-                          style={{ height: spacing.height }}
+                          style={{
+                            height: spacing.height,
+                            zIndex:
+                              hoveredLineIndex === originalIndex
+                                ? 50
+                                : undefined,
+                          }}
                         >
                           {/* Top click zone */}
                           <div
@@ -541,7 +549,9 @@ export function GardenCanvas({
                                 absolute -translate-x-1/2 opacity-50 text-2xl pointer-events-none
                                 ${dragSide === "top" ? "top-0" : "bottom-0"}
                               `}
-                                style={{ left: dragPosition * PIXELS_PER_CM }}
+                                style={{
+                                  left: dragPosition * PIXELS_PER_CM,
+                                }}
                               >
                                 {selectedPlant?.plant.emoji || "?"}
                               </div>
@@ -562,38 +572,66 @@ export function GardenCanvas({
                               <div
                                 key={plantedItem.id}
                                 className={`
-                                  absolute -translate-x-1/2 cursor-pointer group/plant hover:z-50
+                                  absolute -translate-x-1/2 group/plant hover:z-50
                                   ${plantedItem.side === "top" ? "top-0" : "bottom-0"}
                                 `}
                                 style={{
                                   left: plantedItem.positionCm * PIXELS_PER_CM,
                                   zIndex: 10,
                                 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removePlant(originalIndex, plantedItem.id);
-                                }}
+                                onMouseEnter={() =>
+                                  setHoveredLineIndex(originalIndex)
+                                }
+                                onMouseLeave={() => setHoveredLineIndex(null)}
+                                onClick={() =>
+                                  removePlant(originalIndex, plantedItem.id)
+                                }
                               >
-                                <span className="text-2xl select-none hover:scale-110 transition-transform block">
-                                  {plant.emoji}
-                                </span>
-                                <div
-                                  className={`
-                                  absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/plant:opacity-100 
-                                  transition-opacity bg-card border text-foreground text-xs 
-                                  px-2 py-1 rounded shadow-lg whitespace-nowrap z-50
-                                  ${plantedItem.side === "top" ? "bottom-full mb-2" : "top-full mt-2"}
-                                `}
-                                >
-                                  <div className="font-medium">
-                                    {plant.name}
-                                    {variety ? ` (${variety.name})` : ""}
-                                  </div>
-                                  <div className="text-muted-foreground flex items-center gap-2">
-                                    <span>{plantedItem.positionCm}cm</span>
-                                    <span className="text-destructive">
-                                      Clic para eliminar
-                                    </span>
+                                <div className="relative">
+                                  <span className="text-2xl select-none block cursor-pointer">
+                                    {plant.emoji}
+                                  </span>
+
+                                  {/* Remove button - only visible on hover (desktop) */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removePlant(
+                                        originalIndex,
+                                        plantedItem.id,
+                                      );
+                                    }}
+                                    className={`
+                                      absolute -top-1 -right-1 w-4 h-4 rounded-full
+                                      bg-destructive text-destructive-foreground
+                                      items-center justify-center
+                                      opacity-0 group-hover/plant:opacity-100
+                                      hover:scale-110 transition-all
+                                      text-xs font-bold leading-none
+                                      shadow-sm z-10
+                                      hidden md:flex
+                                    `}
+                                    title="Eliminar"
+                                  >
+                                    ×
+                                  </button>
+
+                                  {/* Tooltip */}
+                                  <div
+                                    className={`
+                                    absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/plant:opacity-100
+                                    transition-opacity bg-card border text-foreground text-xs
+                                    px-2 py-1 rounded shadow-lg whitespace-nowrap z-20 pointer-events-none
+                                    ${plantedItem.side === "top" ? "bottom-full mb-2" : "top-full mt-2"}
+                                  `}
+                                  >
+                                    <div className="font-medium">
+                                      {plant.name}
+                                      {variety ? ` (${variety.name})` : ""}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      {plantedItem.positionCm}cm
+                                    </div>
                                   </div>
                                 </div>
                               </div>
