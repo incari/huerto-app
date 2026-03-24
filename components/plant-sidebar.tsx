@@ -38,17 +38,23 @@ export function PlantSidebar({
   const [expandedPlants, setExpandedPlants] = useState<Set<string>>(new Set());
 
   const categories = [
-    { id: "frutas", label: "Frutas", color: "bg-red-100 text-red-700" },
-    { id: "verduras", label: "Verduras", color: "bg-green-100 text-green-700" },
+    { id: "frutos", label: "Frutos", color: "bg-red-100 text-red-700" },
+    { id: "raices", label: "Raíces", color: "bg-orange-100 text-orange-700" },
+    { id: "hojas", label: "Hojas", color: "bg-green-100 text-green-700" },
+    {
+      id: "legumbres",
+      label: "Legumbres",
+      color: "bg-amber-100 text-amber-700",
+    },
     {
       id: "hierbas",
       label: "Hierbas",
       color: "bg-emerald-100 text-emerald-700",
     },
     {
-      id: "legumbres",
-      label: "Legumbres",
-      color: "bg-amber-100 text-amber-700",
+      id: "flores",
+      label: "Flores",
+      color: "bg-pink-100 text-pink-700",
     },
   ];
 

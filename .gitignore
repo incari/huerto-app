@@ -14,3 +14,10 @@ next.user-config.*
 node_modules
 .next/
 .DS_Store
+
+# Database
+data/
+*.db
+*.db-shm
+*.db-wal
+drizzle/

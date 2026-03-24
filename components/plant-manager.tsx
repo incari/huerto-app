@@ -65,10 +65,12 @@ const EMOJI_OPTIONS = [
 ];
 
 const CATEGORIES: { id: Plant["category"]; label: string }[] = [
-  { id: "verduras", label: "Verduras" },
-  { id: "frutas", label: "Frutas" },
-  { id: "hierbas", label: "Hierbas" },
+  { id: "frutos", label: "Frutos" },
+  { id: "raices", label: "Raíces" },
+  { id: "hojas", label: "Hojas" },
   { id: "legumbres", label: "Legumbres" },
+  { id: "hierbas", label: "Hierbas" },
+  { id: "flores", label: "Flores" },
 ];
 
 export function PlantManager({
@@ -112,21 +114,10 @@ export function PlantManager({
       emoji: "🍅",
       spacingCm: 30,
       color: "#22c55e",
-      category: "verduras",
+      category: "frutos",
       growthWeeks: 10,
       harvestWeeks: 8,
       totalWeeks: 20,
-    });
-  };
-
-  const resetVarietyForm = () => {
-    setVarietyFormData({
-      name: "",
-      spacingCm: 30,
-      growthWeeks: 10,
-      harvestWeeks: 8,
-      totalWeeks: 20,
-      notes: "",
     });
   };
 
@@ -139,7 +130,7 @@ export function PlantManager({
       emoji: "🍅",
       spacingCm: 30,
       color: "#22c55e",
-      category: "verduras",
+      category: "frutos",
       timing: { growthWeeks: 10, harvestWeeks: 8, totalWeeks: 20 },
       varieties: [],
     });

@@ -10,7 +10,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Settings, Droplets } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Settings, Droplets, Tag, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface ConfigPanelProps {
   config: GardenConfig;
@@ -105,6 +115,58 @@ export function ConfigPanel({
               step={50}
               className="w-full"
             />
+          </div>
+
+          <div className="flex items-center justify-between space-x-2 pt-2">
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="show-labels" className="text-sm cursor-pointer">
+                Mostrar etiquetas
+              </Label>
+            </div>
+            <Switch
+              id="show-labels"
+              checked={config.showLabels}
+              onCheckedChange={(checked) =>
+                onConfigChange({ ...config, showLabels: checked })
+              }
+            />
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm">Fecha de plantación</Label>
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {config.currentPlantingDate
+                    ? format(new Date(config.currentPlantingDate), "PPP", {
+                        locale: es,
+                      })
+                    : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={new Date(config.currentPlantingDate)}
+                  onSelect={(date) => {
+                    if (date) {
+                      onConfigChange({
+                        ...config,
+                        currentPlantingDate: date.toISOString(),
+                      });
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 

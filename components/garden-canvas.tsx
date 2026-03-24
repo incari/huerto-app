@@ -11,8 +11,10 @@ import {
   getPlantSpacing,
 } from "@/lib/plants";
 import { SelectedPlantData } from "@/components/plant-sidebar";
-import { Button } from "@/components/ui/button";
-import { Plus, Trash2, RotateCcw, Minus } from "lucide-react";
+import { Ruler } from "./garden-canvas/ruler";
+import { Toolbar } from "./garden-canvas/toolbar";
+import { EmptyState } from "./garden-canvas/empty-state";
+import { GardenLineRow } from "./garden-canvas/garden-line-row";
 
 interface GardenCanvasProps {
   lines: GardenLine[];
@@ -40,23 +42,42 @@ export function GardenCanvas({
   const [dragPosition, setDragPosition] = useState<number | null>(null);
   const [dragSide, setDragSide] = useState<"top" | "bottom">("top");
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
+  const [hoverLineIndex, setHoverLineIndex] = useState<number | null>(null);
+  const [hoverSide, setHoverSide] = useState<"top" | "bottom" | null>(null);
+  const [hoverPositionCm, setHoverPositionCm] = useState<number | null>(null);
 
   const getPlantById = (id: string) => plants.find((p) => p.id === id);
 
   // Calculate line heights based on method
   const getLineSpacing = (
     lineIndex: number,
-  ): { height: number; marginBottom: number; isGroupEnd: boolean } => {
+  ): {
+    height: number;
+    marginBottom: number;
+    isGroupEnd: boolean;
+    isMiddleSpace: boolean;
+  } => {
     if (config.method === "parades-crestall" && config.groupConfig) {
-      const { linesPerGroup, intraGroupSpacingCm, interGroupSpacingCm } =
-        config.groupConfig;
+      const {
+        linesPerGroup,
+        subgroupSize,
+        subgroupSpacingCm,
+        middleSpacingCm,
+        interGroupSpacingCm,
+      } = config.groupConfig;
       const positionInGroup = lineIndex % linesPerGroup;
       const isGroupEnd = positionInGroup === linesPerGroup - 1;
+      // Middle space is after the first subgroup (after line 2 in a group of 4)
+      // For a 4-line group (0,1,2,3), middle space is when positionInGroup === 1
+      const isMiddleSpace = positionInGroup === subgroupSize - 1;
 
       return {
-        height: intraGroupSpacingCm * PIXELS_PER_CM,
+        height: isMiddleSpace
+          ? middleSpacingCm * PIXELS_PER_CM
+          : subgroupSpacingCm * PIXELS_PER_CM,
         marginBottom: isGroupEnd ? interGroupSpacingCm * PIXELS_PER_CM : 0,
         isGroupEnd,
+        isMiddleSpace,
       };
     }
 
@@ -64,6 +85,7 @@ export function GardenCanvas({
       height: config.lineSeparationCm * PIXELS_PER_CM,
       marginBottom: 0,
       isGroupEnd: false,
+      isMiddleSpace: false,
     };
   };
 
@@ -164,7 +186,7 @@ export function GardenCanvas({
           lineIndex,
           positionCm: validPosition,
           side,
-          plantedDate: new Date().toISOString(),
+          plantedDate: config.currentPlantingDate,
         };
 
         const newLines = [...lines];
@@ -194,6 +216,41 @@ export function GardenCanvas({
     [],
   );
 
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent, lineIndex: number, side: "top" | "bottom") => {
+      if (!selectedPlant) {
+        setHoverLineIndex(null);
+        setHoverSide(null);
+        setHoverPositionCm(null);
+        return;
+      }
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const positionCm = x / PIXELS_PER_CM;
+
+      const line = lines[lineIndex];
+      const validPosition = findNextValidPosition(
+        line,
+        selectedPlant.plant,
+        selectedPlant.variety?.id,
+        positionCm,
+        side,
+      );
+
+      setHoverLineIndex(lineIndex);
+      setHoverSide(side);
+      setHoverPositionCm(validPosition);
+    },
+    [selectedPlant, lines, plants],
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverLineIndex(null);
+    setHoverSide(null);
+    setHoverPositionCm(null);
+  }, []);
+
   const handleLineClick = useCallback(
     (e: React.MouseEvent, lineIndex: number, side: "top" | "bottom") => {
       if (!selectedPlant) return;
@@ -219,7 +276,7 @@ export function GardenCanvas({
           lineIndex,
           positionCm: validPosition,
           side,
-          plantedDate: new Date().toISOString(),
+          plantedDate: config.currentPlantingDate,
         };
 
         const newLines = [...lines];
@@ -248,14 +305,40 @@ export function GardenCanvas({
   );
 
   const addLine = () => {
-    const lastGroup = lineGroups[lineGroups.length - 1];
-    const newLine: GardenLine = {
-      id: `line-${Date.now()}`,
-      lengthCm: config.defaultLineLengthCm,
-      plants: [],
-      groupId: lastGroup?.id,
-    };
-    onLinesChange([...lines, newLine]);
+    if (config.method === "parades-crestall" && config.groupConfig) {
+      // Add a new bancal (4 lines) with a new group
+      const newGroupId = `group-${Date.now()}`;
+      const newGroup: LineGroup = {
+        id: newGroupId,
+        name: `Bancal ${lineGroups.length + 1}`,
+        color: ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"][
+          lineGroups.length % 5
+        ],
+      };
+      onLineGroupsChange([...lineGroups, newGroup]);
+
+      // Add 4 lines for the new bancal
+      const newLines: GardenLine[] = [];
+      for (let i = 0; i < config.groupConfig.linesPerGroup; i++) {
+        newLines.push({
+          id: `line-${Date.now()}-${i}`,
+          lengthCm: config.defaultLineLengthCm || 400,
+          plants: [],
+          groupId: newGroupId,
+        });
+      }
+      onLinesChange([...lines, ...newLines]);
+    } else {
+      // Traditional method: add single line
+      const lastGroup = lineGroups[lineGroups.length - 1];
+      const newLine: GardenLine = {
+        id: `line-${Date.now()}`,
+        lengthCm: config.defaultLineLengthCm,
+        plants: [],
+        groupId: lastGroup?.id,
+      };
+      onLinesChange([...lines, newLine]);
+    }
   };
 
   const insertLineAfter = (index: number) => {
@@ -304,7 +387,6 @@ export function GardenCanvas({
     ...lines.map((l) => l.lengthCm),
     config.defaultLineLengthCm,
   );
-  const canvasWidthPx = maxLineLengthCm * PIXELS_PER_CM + 120;
 
   // Generate dripper positions
   const dripperPositions = useMemo(
@@ -335,112 +417,28 @@ export function GardenCanvas({
     return groups;
   }, [lines]);
 
-  // Calculate total canvas height
-  const canvasHeightPx = useMemo(() => {
-    if (lines.length === 0) return 200;
-
-    // Calculate height based on actual line heights
-    let totalHeight = 0;
-    lines.forEach((_, index) => {
-      const spacing = getLineSpacing(index);
-      // Add the height of each line (intraGroupSpacingCm)
-      totalHeight += spacing.height;
-    });
-
-    // Add group separators (between actual groups, not calculated groups)
-    const numGroups = groupedLines.length;
-    const numSeparators = numGroups > 1 ? numGroups - 1 : 0;
-    if (numSeparators > 0 && config.groupConfig?.interGroupSpacingCm) {
-      totalHeight +=
-        numSeparators * config.groupConfig.interGroupSpacingCm * PIXELS_PER_CM;
-    }
-
-    const padding = config.groupConfig?.paddingCm
-      ? config.groupConfig.paddingCm * PIXELS_PER_CM * 2
-      : 80;
-    // Add ruler space (pt-10 = 40px) + small bottom margin
-    return totalHeight + padding + 40 + 20;
-  }, [lines, config, groupedLines]);
-
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-background overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-3 border-b border-border bg-card">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={addLine}>
-            <Plus className="h-4 w-4 mr-1" />
-            Linea
-          </Button>
-          <Button variant="outline" size="sm" onClick={clearAll}>
-            <RotateCcw className="h-4 w-4 mr-1" />
-            Limpiar
-          </Button>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-sky-500"></span>
-            Gotero cada {DRIPPER_SPACING_CM}cm
-          </span>
-          {config.method === "parades-crestall" && config.groupConfig && (
-            <span className="text-primary font-medium">
-              Parades: {config.groupConfig.intraGroupSpacingCm}cm entre lineas,{" "}
-              {config.groupConfig.interGroupSpacingCm}cm entre grupos
-            </span>
-          )}
-        </div>
-      </div>
+      <Toolbar onAddLine={addLine} onClearAll={clearAll} config={config} />
 
       {/* Canvas */}
       <div className="min-h-0 overflow-auto p-6 flex-1" ref={canvasRef}>
-        <div
-          className="relative bg-amber-50/50 rounded-xl border-2 border-dashed border-amber-200"
-          style={{
-            width: canvasWidthPx,
-            height: canvasHeightPx,
-            paddingTop: config.groupConfig?.paddingCm
-              ? config.groupConfig.paddingCm * PIXELS_PER_CM
-              : 40,
-            paddingBottom: config.groupConfig?.paddingCm
-              ? config.groupConfig.paddingCm * PIXELS_PER_CM
-              : 40,
-          }}
-        >
-          {/* Ruler - aligned with dripper positions */}
-          <div
-            className="absolute top-2 left-20 flex items-end h-8"
-            style={{ width: maxLineLengthCm * PIXELS_PER_CM }}
-          >
-            {dripperPositions.map((pos) => (
-              <div
-                key={pos}
-                className="absolute flex flex-col items-center"
-                style={{
-                  left: pos * PIXELS_PER_CM,
-                  transform: "translateX(-50%)",
-                }}
-              >
-                {pos % 50 === 0 && (
-                  <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                    {pos}cm
-                  </span>
-                )}
-                <div
-                  className={`w-px ${pos % 50 === 0 ? "h-3 bg-muted-foreground/40" : "h-1.5 bg-muted-foreground/20"}`}
-                />
-              </div>
-            ))}
-          </div>
+        <div className="inline-block">
+          <Ruler
+            maxLineLengthCm={maxLineLengthCm}
+            dripperPositions={dripperPositions}
+          />
 
-          {/* Lines grouped */}
-          <div className="pt-10 pl-20 pr-4">
+          {/* Lines container with dotted border */}
+          <div className="inline-block bg-amber-50/50 rounded-xl border-2 border-dashed border-amber-200 p-4 pl-24 pr-8 pb-8">
             {groupedLines.map((group, groupIndex) => {
               const groupData = lineGroups.find((g) => g.id === group.groupId);
 
               return (
-                <div key={group.groupId} className="relative">
+                <div key={group.groupId} className="relative mb-4">
                   {/* Group label */}
                   {groupData && (
-                    <div className="absolute -left-16 top-0 bottom-0 flex items-center">
+                    <div className="absolute -left-20 top-0 bottom-0 flex items-center">
                       <div
                         className="writing-mode-vertical text-xs font-medium px-1 py-2 rounded"
                         style={{
@@ -457,246 +455,47 @@ export function GardenCanvas({
                   )}
 
                   {group.lines.map(({ line, originalIndex }, indexInGroup) => {
-                    const spacing = getLineSpacing(originalIndex);
+                    const spacing = getLineSpacing(indexInGroup);
                     const isLastInGroup =
                       indexInGroup === group.lines.length - 1;
 
                     return (
-                      <div key={line.id}>
-                        <div
-                          className="relative group"
-                          style={{
-                            height: spacing.height,
-                            zIndex:
-                              hoveredLineIndex === originalIndex
-                                ? 50
-                                : undefined,
-                          }}
-                        >
-                          {/* Top click zone */}
-                          <div
-                            className={`
-                              absolute left-0 h-1/2 cursor-pointer transition-all rounded-t-lg
-                              ${selectedPlant ? "hover:bg-primary/10" : ""}
-                            `}
-                            style={{
-                              top: 0,
-                              width: line.lengthCm * PIXELS_PER_CM,
-                            }}
-                            onDrop={(e) => handleDrop(e, originalIndex)}
-                            onDragOver={(e) => handleDragOver(e, originalIndex)}
-                            onDragLeave={() => {
-                              setDragOverLine(null);
-                              setDragPosition(null);
-                            }}
-                            onClick={(e) =>
-                              handleLineClick(e, originalIndex, "top")
-                            }
-                          />
-
-                          {/* Drip line */}
-                          <div
-                            className={`
-                              absolute left-0 h-1 rounded-full pointer-events-none transition-all
-                              ${dragOverLine === originalIndex ? "bg-primary h-1.5" : "bg-stone-800"}
-                            `}
-                            style={{
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              width: line.lengthCm * PIXELS_PER_CM,
-                            }}
-                          >
-                            {/* Dripper marks */}
-                            {dripperPositions
-                              .filter((pos) => pos <= line.lengthCm)
-                              .map((pos) => (
-                                <div
-                                  key={pos}
-                                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
-                                  style={{ left: pos * PIXELS_PER_CM }}
-                                >
-                                  <div className="w-2 h-2 rounded-full bg-sky-500 border border-sky-600" />
-                                </div>
-                              ))}
-                          </div>
-
-                          {/* Bottom click zone */}
-                          <div
-                            className={`
-                              absolute left-0 h-1/2 cursor-pointer transition-all rounded-b-lg
-                              ${selectedPlant ? "hover:bg-primary/10" : ""}
-                            `}
-                            style={{
-                              bottom: 0,
-                              width: line.lengthCm * PIXELS_PER_CM,
-                            }}
-                            onDrop={(e) => handleDrop(e, originalIndex)}
-                            onDragOver={(e) => handleDragOver(e, originalIndex)}
-                            onDragLeave={() => {
-                              setDragOverLine(null);
-                              setDragPosition(null);
-                            }}
-                            onClick={(e) =>
-                              handleLineClick(e, originalIndex, "bottom")
-                            }
-                          />
-
-                          {/* Drag preview */}
-                          {dragOverLine === originalIndex &&
-                            dragPosition !== null && (
-                              <div
-                                className={`
-                                absolute -translate-x-1/2 opacity-50 text-2xl pointer-events-none
-                                ${dragSide === "top" ? "top-0" : "bottom-0"}
-                              `}
-                                style={{
-                                  left: dragPosition * PIXELS_PER_CM,
-                                }}
-                              >
-                                {selectedPlant?.plant.emoji || "?"}
-                              </div>
-                            )}
-
-                          {/* Plants on this line */}
-                          {line.plants.map((plantedItem) => {
-                            const plant = getPlantById(plantedItem.plantId);
-                            if (!plant) return null;
-
-                            const variety = plantedItem.varietyId
-                              ? plant.varieties.find(
-                                  (v) => v.id === plantedItem.varietyId,
-                                )
-                              : null;
-
-                            return (
-                              <div
-                                key={plantedItem.id}
-                                className={`
-                                  absolute -translate-x-1/2 group/plant hover:z-50
-                                  ${plantedItem.side === "top" ? "top-0" : "bottom-0"}
-                                `}
-                                style={{
-                                  left: plantedItem.positionCm * PIXELS_PER_CM,
-                                  zIndex: 10,
-                                }}
-                                onMouseEnter={() =>
-                                  setHoveredLineIndex(originalIndex)
-                                }
-                                onMouseLeave={() => setHoveredLineIndex(null)}
-                                onClick={() =>
-                                  removePlant(originalIndex, plantedItem.id)
-                                }
-                              >
-                                <div className="relative">
-                                  <span className="text-2xl select-none block cursor-pointer">
-                                    {plant.emoji}
-                                  </span>
-
-                                  {/* Remove button - only visible on hover (desktop) */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removePlant(
-                                        originalIndex,
-                                        plantedItem.id,
-                                      );
-                                    }}
-                                    className={`
-                                      absolute -top-1 -right-1 w-4 h-4 rounded-full
-                                      bg-destructive text-destructive-foreground
-                                      items-center justify-center
-                                      opacity-0 group-hover/plant:opacity-100
-                                      hover:scale-110 transition-all
-                                      text-xs font-bold leading-none
-                                      shadow-sm z-10
-                                      hidden md:flex
-                                    `}
-                                    title="Eliminar"
-                                  >
-                                    ×
-                                  </button>
-
-                                  {/* Tooltip */}
-                                  <div
-                                    className={`
-                                    absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/plant:opacity-100
-                                    transition-opacity bg-card border text-foreground text-xs
-                                    px-2 py-1 rounded shadow-lg whitespace-nowrap z-20 pointer-events-none
-                                    ${plantedItem.side === "top" ? "bottom-full mb-2" : "top-full mt-2"}
-                                  `}
-                                  >
-                                    <div className="font-medium">
-                                      {plant.name}
-                                      {variety ? ` (${variety.name})` : ""}
-                                    </div>
-                                    <div className="text-muted-foreground">
-                                      {plantedItem.positionCm}cm
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {/* Line controls */}
-                          <div
-                            className="absolute top-1/2 -translate-y-1/2 pl-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ left: line.lengthCm * PIXELS_PER_CM }}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => removeLine(originalIndex)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-
-                          {/* Line label */}
-                          <div className="absolute -left-2 top-1/2 -translate-y-1/2 -translate-x-full pr-2">
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              L{originalIndex + 1}
-                            </span>
-                          </div>
-
-                          {/* Insert line button */}
-                          <div
-                            className="absolute left-0 flex items-center justify-center group/separator"
-                            style={{
-                              bottom: -16,
-                              width: line.lengthCm * PIXELS_PER_CM,
-                              height: 32,
-                            }}
-                          >
-                            <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-transparent group-hover/separator:border-amber-300 transition-colors" />
-                            <div className="flex gap-2 opacity-0 group-hover/separator:opacity-100 transition-opacity z-20">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 bg-background hover:bg-primary/10 text-xs"
-                                onClick={() => insertLineAfter(originalIndex)}
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Linea
-                              </Button>
-                              {!isLastInGroup && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 bg-background hover:bg-amber-500/10 text-xs text-amber-600"
-                                  onClick={() =>
-                                    addGroupSeparator(originalIndex)
-                                  }
-                                >
-                                  <Minus className="h-3 w-3 mr-1" />
-                                  Separador
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <GardenLineRow
+                        key={line.id}
+                        line={line}
+                        originalIndex={originalIndex}
+                        indexInGroup={indexInGroup}
+                        isLastInGroup={isLastInGroup}
+                        spacing={spacing}
+                        dragOverLine={dragOverLine}
+                        dragPosition={dragPosition}
+                        dragSide={dragSide}
+                        hoveredLineIndex={hoveredLineIndex}
+                        hoverLineIndex={hoverLineIndex}
+                        hoverSide={hoverSide}
+                        hoverPositionCm={hoverPositionCm}
+                        selectedPlant={selectedPlant}
+                        config={config}
+                        dripperPositions={dripperPositions}
+                        getPlantById={getPlantById}
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onDragLeave={() => {
+                          setDragOverLine(null);
+                          setDragPosition(null);
+                        }}
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                        onLineClick={handleLineClick}
+                        onRemovePlant={removePlant}
+                        onInsertLineAfter={insertLineAfter}
+                        onAddGroupSeparator={addGroupSeparator}
+                        onRemoveLine={removeLine}
+                        setHoveredLineIndex={setHoveredLineIndex}
+                        groupData={groupData}
+                        lineGroups={lineGroups}
+                        onLineGroupsChange={onLineGroupsChange}
+                      />
                     );
                   })}
 
@@ -723,20 +522,14 @@ export function GardenCanvas({
                 </div>
               );
             })}
-          </div>
 
-          {lines.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <p className="text-lg font-medium mb-2">No hay lineas de goteo</p>
-              <p className="text-sm mb-4">
-                Anade lineas para empezar a plantar
-              </p>
-              <Button onClick={addLine}>
-                <Plus className="h-4 w-4 mr-1" />
-                Anadir primera linea
-              </Button>
-            </div>
-          )}
+            {lines.length === 0 && (
+              <EmptyState
+                onAddLine={addLine}
+                defaultLineLengthCm={config.defaultLineLengthCm}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

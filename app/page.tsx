@@ -6,6 +6,7 @@ import { GardenCanvas } from "@/components/garden-canvas";
 import { ConfigPanel } from "@/components/config-panel";
 import { PlantManager } from "@/components/plant-manager";
 import { PlantTimeline } from "@/components/plant-timeline";
+import { SaveLoadDialog } from "@/components/save-load-dialog";
 import {
   Plant,
   GardenLine,
@@ -56,12 +57,14 @@ export default function GardenPlannerPage() {
     { id: "group-1", name: "Bancal 1", color: "#22c55e" },
   ]);
 
-  const [lines, setLines] = useState<GardenLine[]>([
-    { id: "line-1", lengthCm: 300, plants: [], groupId: "group-1" },
-    { id: "line-2", lengthCm: 300, plants: [], groupId: "group-1" },
-    { id: "line-3", lengthCm: 300, plants: [], groupId: "group-1" },
-    { id: "line-4", lengthCm: 300, plants: [], groupId: "group-1" },
-  ]);
+  const [lines, setLines] = useState<GardenLine[]>([]);
+
+  const [currentGardenId, setCurrentGardenId] = useState<number | null>(null);
+  const [currentGardenName, setCurrentGardenName] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
+    "idle",
+  );
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Actualizar el largo de todas las líneas cuando cambia la configuración
   useEffect(() => {
@@ -84,6 +87,169 @@ export default function GardenPlannerPage() {
   const handleDragStart = (data: SelectedPlantData) => {
     setSelectedPlant(data);
   };
+
+  const handleSelectPlant = (data: SelectedPlantData | null) => {
+    setSelectedPlant(data);
+    setPlantSidebarOpen(false);
+  };
+
+  useEffect(() => {
+    const initializeGarden = async () => {
+      try {
+        const response = await fetch("/api/gardens");
+        if (response.ok) {
+          const gardens = await response.json();
+          if (gardens.length > 0) {
+            const lastGarden = gardens[gardens.length - 1];
+            const savedConfig = lastGarden.config;
+            setCurrentGardenId(lastGarden.id);
+            setCurrentGardenName(lastGarden.name);
+
+            // Ensure all lines have a valid lengthCm
+            const loadedLines = (savedConfig.lines || []).map(
+              (line: GardenLine) => ({
+                ...line,
+                lengthCm:
+                  line.lengthCm || savedConfig.defaultLineLengthCm || 400,
+              }),
+            );
+            setLines(loadedLines);
+
+            setLineGroups(
+              savedConfig.lineGroups || [
+                { id: "group-1", name: "Bancal 1", color: "#22c55e" },
+              ],
+            );
+            // Extract only the config properties, not lines/lineGroups
+            setConfig({
+              lineSeparationCm: savedConfig.lineSeparationCm || 40,
+              defaultLineLengthCm: savedConfig.defaultLineLengthCm || 400,
+              method: savedConfig.method || "parades-crestall",
+              showLabels:
+                savedConfig.showLabels !== undefined
+                  ? savedConfig.showLabels
+                  : true,
+              currentPlantingDate:
+                savedConfig.currentPlantingDate || new Date().toISOString(),
+              groupConfig:
+                savedConfig.groupConfig ||
+                gardenMethods["parades-crestall"].groupConfig,
+            });
+          } else {
+            const response = await fetch("/api/gardens", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: "Mi Huerto",
+                config: {
+                  ...config,
+                  lines: [],
+                  lineGroups: [
+                    { id: "group-1", name: "Bancal 1", color: "#22c55e" },
+                  ],
+                },
+                plants: [],
+                middlePlants: [],
+              }),
+            });
+            if (response.ok) {
+              const newGarden = await response.json();
+              setCurrentGardenId(newGarden.id);
+              setCurrentGardenName(newGarden.name);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing garden:", error);
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    initializeGarden();
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized || !currentGardenId) return;
+
+    setSaveStatus("saving");
+    const timeoutId = setTimeout(async () => {
+      try {
+        const configToSave = {
+          lineSeparationCm: config.lineSeparationCm,
+          defaultLineLengthCm: config.defaultLineLengthCm,
+          method: config.method,
+          showLabels: config.showLabels,
+          currentPlantingDate: config.currentPlantingDate,
+          groupConfig: config.groupConfig,
+          lines,
+          lineGroups,
+        };
+
+        const response = await fetch(`/api/gardens/${currentGardenId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: currentGardenName,
+            config: configToSave,
+          }),
+        });
+
+        if (response.ok) {
+          setSaveStatus("saved");
+          setTimeout(() => setSaveStatus("idle"), 2000);
+        }
+      } catch (error) {
+        console.error("Error auto-saving garden:", error);
+        setSaveStatus("idle");
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    lines,
+    lineGroups,
+    config,
+    currentGardenId,
+    currentGardenName,
+    isInitialized,
+  ]);
+
+  const handleLoadGarden = (data: {
+    gardenId: number;
+    gardenName: string;
+    lines: GardenLine[];
+    lineGroups: LineGroup[];
+    config: GardenConfig;
+  }) => {
+    setCurrentGardenId(data.gardenId);
+    setCurrentGardenName(data.gardenName);
+
+    // Ensure all lines have a valid lengthCm
+    const loadedLines = data.lines.map((line) => ({
+      ...line,
+      lengthCm: line.lengthCm || data.config.defaultLineLengthCm || 400,
+    }));
+    setLines(loadedLines);
+
+    setLineGroups(data.lineGroups);
+
+    // Extract only the config properties, not lines/lineGroups
+    setConfig({
+      lineSeparationCm: data.config.lineSeparationCm || 40,
+      defaultLineLengthCm: data.config.defaultLineLengthCm || 400,
+      method: data.config.method || "parades-crestall",
+      showLabels:
+        data.config.showLabels !== undefined ? data.config.showLabels : true,
+      currentPlantingDate:
+        data.config.currentPlantingDate || new Date().toISOString(),
+      groupConfig:
+        data.config.groupConfig ||
+        gardenMethods["parades-crestall"].groupConfig,
+    });
+  };
+
+  const handleSave = () => {};
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -114,6 +280,17 @@ export default function GardenPlannerPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <SaveLoadDialog
+            currentGardenId={currentGardenId}
+            currentGardenName={currentGardenName}
+            lines={lines}
+            lineGroups={lineGroups}
+            config={config}
+            onLoad={handleLoadGarden}
+            onSave={handleSave}
+            saveStatus={saveStatus}
+          />
+
           {/* Mobile config button */}
           <Button
             variant="ghost"
@@ -200,7 +377,7 @@ export default function GardenPlannerPage() {
         <Sheet open={plantSidebarOpen} onOpenChange={setPlantSidebarOpen}>
           <SheetContent
             side="left"
-            className="p-0 w-80 sm:w-96"
+            className="p-0 w-80 sm:w-96 gap-0"
             aria-describedby="plant-sidebar-description"
           >
             <SheetHeader className="sr-only">
@@ -213,7 +390,7 @@ export default function GardenPlannerPage() {
               plants={plants}
               onDragStart={handleDragStart}
               selectedPlant={selectedPlant}
-              onSelectPlant={setSelectedPlant}
+              onSelectPlant={handleSelectPlant}
               onOpenManager={() => setManagerOpen(true)}
             />
           </SheetContent>
@@ -231,6 +408,33 @@ export default function GardenPlannerPage() {
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Selected Plant Indicator */}
+          {selectedPlant && (
+            <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{selectedPlant.plant.emoji}</span>
+                <div>
+                  <p className="text-sm font-medium">
+                    {selectedPlant.plant.name}
+                    {selectedPlant.variety &&
+                      ` (${selectedPlant.variety.name})`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Haz clic en el huerto para plantar
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedPlant(null)}
+                className="h-8"
+              >
+                Cancelar
+              </Button>
+            </div>
+          )}
+
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}

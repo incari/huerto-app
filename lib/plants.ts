@@ -18,116 +18,45 @@ export interface Plant {
   emoji: string;
   spacingCm: number; // Espaciamiento por defecto
   color: string;
-  category: "frutas" | "verduras" | "hierbas" | "legumbres";
+  category: "raices" | "hojas" | "frutos" | "legumbres" | "hierbas" | "flores";
   timing: PlantTiming; // Tiempos por defecto
   varieties: PlantVariety[];
 }
 
 export const defaultPlants: Plant[] = [
-  // Frutas
-  {
-    id: "strawberry",
-    name: "Fresa",
-    emoji: "🍓",
-    spacingCm: 25,
-    color: "#ef4444",
-    category: "frutas",
-    timing: { growthWeeks: 8, harvestWeeks: 16, totalWeeks: 40 },
-    varieties: [
-      {
-        id: "strawberry-san-andreas",
-        name: "San Andreas",
-        spacingCm: 25,
-        timing: { growthWeeks: 6, harvestWeeks: 20, totalWeeks: 40 },
-      },
-      {
-        id: "strawberry-camarosa",
-        name: "Camarosa",
-        spacingCm: 30,
-        timing: { growthWeeks: 8, harvestWeeks: 16, totalWeeks: 36 },
-      },
-    ],
-  },
-  {
-    id: "watermelon",
-    name: "Sandía",
-    emoji: "🍉",
-    spacingCm: 100,
-    color: "#22c55e",
-    category: "frutas",
-    timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 },
-    varieties: [
-      {
-        id: "watermelon-crimson",
-        name: "Crimson Sweet",
-        spacingCm: 100,
-        timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 },
-      },
-      {
-        id: "watermelon-sugar-baby",
-        name: "Sugar Baby",
-        spacingCm: 80,
-        timing: { growthWeeks: 10, harvestWeeks: 3, totalWeeks: 15 },
-      },
-    ],
-  },
-  {
-    id: "melon",
-    name: "Melón",
-    emoji: "🍈",
-    spacingCm: 90,
-    color: "#fbbf24",
-    category: "frutas",
-    timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 16 },
-    varieties: [
-      {
-        id: "melon-piel-sapo",
-        name: "Piel de Sapo",
-        spacingCm: 90,
-        timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 },
-      },
-      {
-        id: "melon-cantalupo",
-        name: "Cantalupo",
-        spacingCm: 80,
-        timing: { growthWeeks: 10, harvestWeeks: 3, totalWeeks: 15 },
-      },
-    ],
-  },
-
-  // Verduras
+  // FRUTOS (Tomates, Pimientos, Berenjenas, Calabacines, Melones, Sandías, Calabazas, Pepinos)
   {
     id: "tomato",
     name: "Tomate",
     emoji: "🍅",
-    spacingCm: 50,
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
     color: "#dc2626",
-    category: "verduras",
-    timing: { growthWeeks: 12, harvestWeeks: 12, totalWeeks: 32 },
+    category: "frutos",
+    timing: { growthWeeks: 12, harvestWeeks: 12, totalWeeks: 27 }, // 12w growth + 12w harvest + 3w buffer
     varieties: [
       {
         id: "tomato-cherry",
         name: "Cherry",
-        spacingCm: 40,
-        timing: { growthWeeks: 10, harvestWeeks: 14, totalWeeks: 28 },
+        spacingCm: 50,
+        timing: { growthWeeks: 10, harvestWeeks: 14, totalWeeks: 27 },
       },
       {
         id: "tomato-raf",
         name: "RAF",
-        spacingCm: 60,
-        timing: { growthWeeks: 14, harvestWeeks: 10, totalWeeks: 32 },
-      },
-      {
-        id: "tomato-roma",
-        name: "Roma",
         spacingCm: 50,
-        timing: { growthWeeks: 11, harvestWeeks: 12, totalWeeks: 30 },
+        timing: { growthWeeks: 14, harvestWeeks: 10, totalWeeks: 27 },
       },
       {
-        id: "tomato-corazon-buey",
-        name: "Corazón de Buey",
-        spacingCm: 60,
-        timing: { growthWeeks: 14, harvestWeeks: 10, totalWeeks: 32 },
+        id: "tomato-verano",
+        name: "Verano",
+        spacingCm: 50,
+        timing: { growthWeeks: 11, harvestWeeks: 12, totalWeeks: 26 },
+      },
+      {
+        id: "tomato-invierno",
+        name: "Invierno",
+        spacingCm: 50,
+        timing: { growthWeeks: 14, harvestWeeks: 10, totalWeeks: 27 },
       },
     ],
   },
@@ -135,57 +64,22 @@ export const defaultPlants: Plant[] = [
     id: "pepper",
     name: "Pimiento",
     emoji: "🫑",
-    spacingCm: 40,
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
     color: "#16a34a",
-    category: "verduras",
-    timing: { growthWeeks: 10, harvestWeeks: 12, totalWeeks: 28 },
+    category: "frutos",
+    timing: { growthWeeks: 10, harvestWeeks: 12, totalWeeks: 25 }, // 10w growth + 12w harvest + 3w buffer
     varieties: [
       {
-        id: "pepper-california",
-        name: "California",
-        spacingCm: 45,
-        timing: { growthWeeks: 12, harvestWeeks: 12, totalWeeks: 30 },
+        id: "pepper-verde",
+        name: "Verde",
+        spacingCm: 50,
+        timing: { growthWeeks: 10, harvestWeeks: 12, totalWeeks: 25 },
       },
       {
-        id: "pepper-italiano",
-        name: "Italiano",
-        spacingCm: 40,
-        timing: { growthWeeks: 10, harvestWeeks: 14, totalWeeks: 28 },
-      },
-      {
-        id: "pepper-padron",
-        name: "Padrón",
-        spacingCm: 35,
-        timing: { growthWeeks: 8, harvestWeeks: 16, totalWeeks: 26 },
-      },
-    ],
-  },
-  {
-    id: "chili",
-    name: "Chile",
-    emoji: "🌶️",
-    spacingCm: 35,
-    color: "#b91c1c",
-    category: "verduras",
-    timing: { growthWeeks: 12, harvestWeeks: 16, totalWeeks: 32 },
-    varieties: [
-      {
-        id: "chili-jalapeno",
-        name: "Jalapeño",
-        spacingCm: 35,
-        timing: { growthWeeks: 12, harvestWeeks: 16, totalWeeks: 32 },
-      },
-      {
-        id: "chili-habanero",
-        name: "Habanero",
-        spacingCm: 40,
-        timing: { growthWeeks: 14, harvestWeeks: 14, totalWeeks: 34 },
-      },
-      {
-        id: "chili-cayenne",
-        name: "Cayena",
-        spacingCm: 30,
-        timing: { growthWeeks: 10, harvestWeeks: 18, totalWeeks: 30 },
+        id: "pepper-asar",
+        name: "Asar",
+        spacingCm: 50,
+        timing: { growthWeeks: 12, harvestWeeks: 12, totalWeeks: 27 },
       },
     ],
   },
@@ -193,153 +87,94 @@ export const defaultPlants: Plant[] = [
     id: "eggplant",
     name: "Berenjena",
     emoji: "🍆",
-    spacingCm: 60,
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
     color: "#7c3aed",
-    category: "verduras",
-    timing: { growthWeeks: 10, harvestWeeks: 14, totalWeeks: 28 },
-    varieties: [
-      {
-        id: "eggplant-black-beauty",
-        name: "Black Beauty",
-        spacingCm: 60,
-        timing: { growthWeeks: 10, harvestWeeks: 14, totalWeeks: 28 },
-      },
-      {
-        id: "eggplant-listada",
-        name: "Listada de Gandía",
-        spacingCm: 55,
-        timing: { growthWeeks: 12, harvestWeeks: 12, totalWeeks: 28 },
-      },
-    ],
+    category: "frutos",
+    timing: { growthWeeks: 10, harvestWeeks: 14, totalWeeks: 27 }, // 10w growth + 14w harvest + 3w buffer
+    varieties: [],
   },
   {
-    id: "carrot",
-    name: "Zanahoria",
-    emoji: "🥕",
-    spacingCm: 8,
-    color: "#f97316",
-    category: "verduras",
-    timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 16 },
-    varieties: [
-      {
-        id: "carrot-nantes",
-        name: "Nantes",
-        spacingCm: 8,
-        timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 14 },
-      },
-      {
-        id: "carrot-chantenay",
-        name: "Chantenay",
-        spacingCm: 10,
-        timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 16 },
-      },
-    ],
+    id: "zucchini",
+    name: "Calabacín",
+    emoji: "🥒",
+    spacingCm: 75, // 1 plant every 75cm (alternating sides)
+    color: "#4ade80",
+    category: "frutos",
+    timing: { growthWeeks: 8, harvestWeeks: 10, totalWeeks: 20 }, // 8w growth + 10w harvest + 2w buffer
+    varieties: [],
   },
   {
-    id: "corn",
-    name: "Maíz",
-    emoji: "🌽",
-    spacingCm: 30,
-    color: "#eab308",
-    category: "verduras",
-    timing: { growthWeeks: 12, harvestWeeks: 2, totalWeeks: 16 },
-    varieties: [
-      {
-        id: "corn-dulce",
-        name: "Dulce",
-        spacingCm: 30,
-        timing: { growthWeeks: 12, harvestWeeks: 2, totalWeeks: 16 },
-      },
-      {
-        id: "corn-palomitas",
-        name: "Palomitas",
-        spacingCm: 25,
-        timing: { growthWeeks: 14, harvestWeeks: 2, totalWeeks: 18 },
-      },
-    ],
+    id: "pumpkin",
+    name: "Calabaza",
+    emoji: "🎃",
+    spacingCm: 100, // 1 plant every 100cm (alternating sides)
+    color: "#ea580c",
+    category: "frutos",
+    timing: { growthWeeks: 14, harvestWeeks: 6, totalWeeks: 22 }, // 14w growth + 6w harvest + 2w buffer
+    varieties: [],
   },
   {
-    id: "lettuce",
-    name: "Lechuga",
-    emoji: "🥬",
-    spacingCm: 25,
-    color: "#84cc16",
-    category: "verduras",
-    timing: { growthWeeks: 8, harvestWeeks: 2, totalWeeks: 10 },
-    varieties: [
-      {
-        id: "lettuce-romana",
-        name: "Romana",
-        spacingCm: 25,
-        timing: { growthWeeks: 8, harvestWeeks: 2, totalWeeks: 10 },
-      },
-      {
-        id: "lettuce-iceberg",
-        name: "Iceberg",
-        spacingCm: 30,
-        timing: { growthWeeks: 10, harvestWeeks: 2, totalWeeks: 12 },
-      },
-      {
-        id: "lettuce-batavia",
-        name: "Batavia",
-        spacingCm: 25,
-        timing: { growthWeeks: 7, harvestWeeks: 2, totalWeeks: 9 },
-      },
-    ],
+    id: "watermelon",
+    name: "Sandía",
+    emoji: "🍉",
+    spacingCm: 100, // 1 plant every 100cm (alternating sides)
+    color: "#22c55e",
+    category: "frutos",
+    timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 }, // 12w growth + 4w harvest + 2w buffer
+    varieties: [],
   },
   {
-    id: "broccoli",
-    name: "Brócoli",
-    emoji: "🥦",
-    spacingCm: 45,
-    color: "#15803d",
-    category: "verduras",
-    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 },
+    id: "melon",
+    name: "Melón",
+    emoji: "🍈",
+    spacingCm: 100, // 1 plant every 100cm (alternating sides)
+    color: "#fbbf24",
+    category: "frutos",
+    timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 16 }, // 10w growth + 4w harvest + 2w buffer
     varieties: [],
   },
   {
     id: "cucumber",
     name: "Pepino",
     emoji: "🥒",
-    spacingCm: 40,
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
     color: "#65a30d",
-    category: "verduras",
-    timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 },
-    varieties: [
-      {
-        id: "cucumber-español",
-        name: "Español",
-        spacingCm: 40,
-        timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 },
-      },
-      {
-        id: "cucumber-pepinillo",
-        name: "Pepinillo",
-        spacingCm: 30,
-        timing: { growthWeeks: 6, harvestWeeks: 6, totalWeeks: 14 },
-      },
-    ],
+    category: "frutos",
+    timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 }, // 8w growth + 8w harvest + 2w buffer
+    varieties: [],
   },
   {
-    id: "onion",
-    name: "Cebolla",
-    emoji: "🧅",
-    spacingCm: 10,
-    color: "#d97706",
-    category: "verduras",
-    timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 20 },
+    id: "strawberry",
+    name: "Fresa",
+    emoji: "🍓",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#ef4444",
+    category: "frutos",
+    timing: { growthWeeks: 8, harvestWeeks: 16, totalWeeks: 26 }, // 8w growth + 16w harvest + 2w buffer
+    varieties: [],
+  },
+
+  // RAÍCES (Zanahorias, Ajos, Cebollas, Puerros, Rábanos, Remolachas, Nabos, Patatas, Apios, Hinojos)
+  {
+    id: "carrot",
+    name: "Zanahoria",
+    emoji: "🥕",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#f97316",
+    category: "raices",
+    timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 }, // 12w growth + 4w harvest + 2w buffer
     varieties: [
       {
-        id: "onion-blanca",
-        name: "Blanca",
-        spacingCm: 10,
-        timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 20 },
+        id: "carrot-naranja",
+        name: "Naranja",
+        spacingCm: 25,
+        timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 },
       },
       {
-        id: "onion-morada",
+        id: "carrot-morada",
         name: "Morada",
-        spacingCm: 12,
-        timing: { growthWeeks: 18, harvestWeeks: 4, totalWeeks: 22 },
+        spacingCm: 25,
+        timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 },
       },
     ],
   },
@@ -347,166 +182,515 @@ export const defaultPlants: Plant[] = [
     id: "garlic",
     name: "Ajo",
     emoji: "🧄",
-    spacingCm: 10,
+    spacingCm: 25, // 1 plant every 25cm (both sides)
     color: "#f5f5f4",
-    category: "verduras",
-    timing: { growthWeeks: 24, harvestWeeks: 4, totalWeeks: 28 },
+    category: "raices",
+    timing: { growthWeeks: 24, harvestWeeks: 4, totalWeeks: 30 }, // 24w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "onion",
+    name: "Cebolla",
+    emoji: "🧅",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#d97706",
+    category: "raices",
+    timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 22 }, // 16w growth + 4w harvest + 2w buffer
     varieties: [
       {
-        id: "garlic-blanco",
-        name: "Blanco",
-        spacingCm: 10,
-        timing: { growthWeeks: 24, harvestWeeks: 4, totalWeeks: 28 },
+        id: "onion-blanca",
+        name: "Blanca",
+        spacingCm: 25,
+        timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 22 },
       },
       {
-        id: "garlic-morado",
-        name: "Morado",
-        spacingCm: 12,
-        timing: { growthWeeks: 26, harvestWeeks: 4, totalWeeks: 30 },
+        id: "onion-roja",
+        name: "Roja",
+        spacingCm: 25,
+        timing: { growthWeeks: 18, harvestWeeks: 4, totalWeeks: 24 },
       },
     ],
+  },
+  {
+    id: "leek",
+    name: "Puerro",
+    emoji: "🧅",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#84cc16",
+    category: "raices",
+    timing: { growthWeeks: 20, harvestWeeks: 8, totalWeeks: 30 }, // 20w growth + 8w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "radish",
+    name: "Rabanito",
+    emoji: "🌱",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#e11d48",
+    category: "raices",
+    timing: { growthWeeks: 4, harvestWeeks: 2, totalWeeks: 7 }, // 4w growth + 2w harvest + 1w buffer
+    varieties: [],
+  },
+  {
+    id: "beet",
+    name: "Remolacha",
+    emoji: "🫚",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#be123c",
+    category: "raices",
+    timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 16 }, // 10w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "turnip",
+    name: "Nabo",
+    emoji: "🫚",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#e5e5e5",
+    category: "raices",
+    timing: { growthWeeks: 8, harvestWeeks: 4, totalWeeks: 14 }, // 8w growth + 4w harvest + 2w buffer
+    varieties: [],
   },
   {
     id: "potato",
     name: "Patata",
     emoji: "🥔",
-    spacingCm: 30,
+    spacingCm: 25, // 1 plant every 25cm (both sides)
     color: "#a16207",
-    category: "verduras",
-    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 18 },
+    category: "raices",
+    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 }, // 14w growth + 4w harvest + 2w buffer
     varieties: [
       {
-        id: "potato-kennebec",
-        name: "Kennebec",
-        spacingCm: 30,
-        timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 18 },
+        id: "potato-normal",
+        name: "Normal",
+        spacingCm: 25,
+        timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 },
       },
       {
-        id: "potato-red-pontiac",
-        name: "Red Pontiac",
-        spacingCm: 30,
-        timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 16 },
+        id: "potato-morada",
+        name: "Morada",
+        spacingCm: 25,
+        timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 22 },
       },
     ],
   },
   {
-    id: "radish",
-    name: "Rábano",
-    emoji: "🫛",
-    spacingCm: 5,
-    color: "#e11d48",
-    category: "verduras",
-    timing: { growthWeeks: 4, harvestWeeks: 2, totalWeeks: 6 },
+    id: "celery",
+    name: "Apio",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#84cc16",
+    category: "raices",
+    timing: { growthWeeks: 16, harvestWeeks: 8, totalWeeks: 26 }, // 16w growth + 8w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "fennel",
+    name: "Hinojo",
+    emoji: "🌿",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#a3e635",
+    category: "raices",
+    timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 }, // 12w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+
+  // HOJAS (Lechugas, Acelgas, Espinacas, Rúcula, Escarola, Canónigos, Endivia, Coles, Brócoli, Romanesco, Col de Bruselas, Coliflor, Lombarda)
+  {
+    id: "lettuce",
+    name: "Lechuga",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#84cc16",
+    category: "hojas",
+    timing: { growthWeeks: 8, harvestWeeks: 2, totalWeeks: 11 }, // 8w growth + 2w harvest + 1w buffer
+    varieties: [],
+  },
+  {
+    id: "chard",
+    name: "Acelga",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#22c55e",
+    category: "hojas",
+    timing: { growthWeeks: 10, harvestWeeks: 12, totalWeeks: 24 }, // 10w growth + 12w harvest + 2w buffer
+    varieties: [
+      {
+        id: "chard-blanca",
+        name: "Blanca",
+        spacingCm: 25,
+        timing: { growthWeeks: 10, harvestWeeks: 12, totalWeeks: 24 },
+      },
+      {
+        id: "chard-roja",
+        name: "Roja",
+        spacingCm: 25,
+        timing: { growthWeeks: 10, harvestWeeks: 12, totalWeeks: 24 },
+      },
+    ],
+  },
+  {
+    id: "spinach",
+    name: "Espinaca",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#16a34a",
+    category: "hojas",
+    timing: { growthWeeks: 6, harvestWeeks: 4, totalWeeks: 11 }, // 6w growth + 4w harvest + 1w buffer
+    varieties: [],
+  },
+
+  {
+    id: "arugula",
+    name: "Rúcula",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#65a30d",
+    category: "hojas",
+    timing: { growthWeeks: 4, harvestWeeks: 6, totalWeeks: 11 }, // 4w growth + 6w harvest + 1w buffer
+    varieties: [],
+  },
+  {
+    id: "escarole",
+    name: "Escarola",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#84cc16",
+    category: "hojas",
+    timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 16 }, // 10w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "corn-salad",
+    name: "Canónigos",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#22c55e",
+    category: "hojas",
+    timing: { growthWeeks: 6, harvestWeeks: 4, totalWeeks: 11 }, // 6w growth + 4w harvest + 1w buffer
+    varieties: [],
+  },
+  {
+    id: "endive",
+    name: "Endivia",
+    emoji: "🥬",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#fef08a",
+    category: "hojas",
+    timing: { growthWeeks: 12, harvestWeeks: 4, totalWeeks: 18 }, // 12w growth + 4w harvest + 2w buffer
     varieties: [],
   },
   {
     id: "cabbage",
     name: "Col",
-    emoji: "🥗",
-    spacingCm: 45,
+    emoji: "🥬",
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
     color: "#86efac",
-    category: "verduras",
-    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 },
+    category: "hojas",
+    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 }, // 14w growth + 4w harvest + 2w buffer
     varieties: [],
   },
   {
-    id: "pumpkin",
-    name: "Calabaza",
-    emoji: "🎃",
-    spacingCm: 100,
-    color: "#ea580c",
-    category: "verduras",
-    timing: { growthWeeks: 14, harvestWeeks: 6, totalWeeks: 22 },
+    id: "broccoli",
+    name: "Brócoli",
+    emoji: "🥦",
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
+    color: "#15803d",
+    category: "hojas",
+    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 }, // 14w growth + 4w harvest + 2w buffer
     varieties: [],
   },
   {
-    id: "zucchini",
-    name: "Calabacín",
-    emoji: "🥒",
-    spacingCm: 80,
-    color: "#4ade80",
-    category: "verduras",
-    timing: { growthWeeks: 8, harvestWeeks: 10, totalWeeks: 20 },
+    id: "romanesco",
+    name: "Romanesco",
+    emoji: "🥦",
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
+    color: "#84cc16",
+    category: "hojas",
+    timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 22 }, // 16w growth + 4w harvest + 2w buffer
     varieties: [],
   },
-
-  // Hierbas
   {
-    id: "basil",
-    name: "Albahaca",
-    emoji: "🌿",
-    spacingCm: 20,
+    id: "brussels-sprouts",
+    name: "Col de Bruselas",
+    emoji: "🥬",
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
     color: "#22c55e",
-    category: "hierbas",
-    timing: { growthWeeks: 6, harvestWeeks: 12, totalWeeks: 20 },
-    varieties: [
-      {
-        id: "basil-genovesa",
-        name: "Genovesa",
-        spacingCm: 20,
-        timing: { growthWeeks: 6, harvestWeeks: 12, totalWeeks: 20 },
-      },
-      {
-        id: "basil-morada",
-        name: "Morada",
-        spacingCm: 25,
-        timing: { growthWeeks: 8, harvestWeeks: 10, totalWeeks: 20 },
-      },
-    ],
-  },
-  {
-    id: "parsley",
-    name: "Perejil",
-    emoji: "🌱",
-    spacingCm: 15,
-    color: "#16a34a",
-    category: "hierbas",
-    timing: { growthWeeks: 8, harvestWeeks: 20, totalWeeks: 30 },
+    category: "hojas",
+    timing: { growthWeeks: 18, harvestWeeks: 8, totalWeeks: 28 }, // 18w growth + 8w harvest + 2w buffer
     varieties: [],
   },
   {
-    id: "mint",
-    name: "Menta",
-    emoji: "🍃",
-    spacingCm: 30,
-    color: "#10b981",
-    category: "hierbas",
-    timing: { growthWeeks: 6, harvestWeeks: 30, totalWeeks: 52 },
+    id: "cauliflower",
+    name: "Coliflor",
+    emoji: "🥦",
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
+    color: "#f5f5f4",
+    category: "hojas",
+    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 }, // 14w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "red-cabbage",
+    name: "Lombarda",
+    emoji: "🥬",
+    spacingCm: 50, // 1 plant every 50cm (alternating sides)
+    color: "#7c3aed",
+    category: "hojas",
+    timing: { growthWeeks: 16, harvestWeeks: 4, totalWeeks: 22 }, // 16w growth + 4w harvest + 2w buffer
     varieties: [],
   },
 
-  // Legumbres
+  // LEGUMBRES (Habas, Guisantes, Habichuelas, Judiones, Judías Rojas, Altramuces)
   {
-    id: "bean",
-    name: "Judía",
+    id: "fava-bean",
+    name: "Haba",
     emoji: "🫘",
-    spacingCm: 15,
-    color: "#92400e",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#65a30d",
     category: "legumbres",
-    timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 },
-    varieties: [
-      {
-        id: "bean-verde",
-        name: "Verde",
-        spacingCm: 15,
-        timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 },
-      },
-      {
-        id: "bean-enrame",
-        name: "Enrame",
-        spacingCm: 20,
-        timing: { growthWeeks: 10, harvestWeeks: 10, totalWeeks: 22 },
-      },
-    ],
+    timing: { growthWeeks: 16, harvestWeeks: 6, totalWeeks: 24 }, // 16w growth + 6w harvest + 2w buffer
+    varieties: [],
   },
   {
     id: "pea",
     name: "Guisante",
     emoji: "🫛",
-    spacingCm: 8,
-    color: "#65a30d",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#84cc16",
     category: "legumbres",
-    timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 16 },
+    timing: { growthWeeks: 10, harvestWeeks: 4, totalWeeks: 16 }, // 10w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "green-bean",
+    name: "Habichuela",
+    emoji: "🫘",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#22c55e",
+    category: "legumbres",
+    timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 }, // 8w growth + 8w harvest + 2w buffer
+    varieties: [
+      {
+        id: "green-bean-mata-baja",
+        name: "Mata Baja",
+        spacingCm: 25,
+        timing: { growthWeeks: 8, harvestWeeks: 8, totalWeeks: 18 },
+      },
+      {
+        id: "green-bean-mata-alta",
+        name: "Mata Alta",
+        spacingCm: 25,
+        timing: { growthWeeks: 10, harvestWeeks: 10, totalWeeks: 22 },
+      },
+    ],
+  },
+  {
+    id: "runner-bean",
+    name: "Judión",
+    emoji: "🫘",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#16a34a",
+    category: "legumbres",
+    timing: { growthWeeks: 12, harvestWeeks: 8, totalWeeks: 22 }, // 12w growth + 8w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "red-bean",
+    name: "Judía Roja",
+    emoji: "🫘",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#dc2626",
+    category: "legumbres",
+    timing: { growthWeeks: 10, harvestWeeks: 6, totalWeeks: 18 }, // 10w growth + 6w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "lupin",
+    name: "Altramuz",
+    emoji: "🌱",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#eab308",
+    category: "legumbres",
+    timing: { growthWeeks: 14, harvestWeeks: 4, totalWeeks: 20 }, // 14w growth + 4w harvest + 2w buffer
+    varieties: [],
+  },
+
+  // HIERBAS (Albahaca, Perejil, Romero, Eneldo, Salvia, Orégano, Tomillo Limón, Cebollino, Stevia, Ruda)
+  // Middle zone only - 100cm spacing
+  {
+    id: "basil",
+    name: "Albahaca",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#22c55e",
+    category: "hierbas",
+    timing: { growthWeeks: 6, harvestWeeks: 12, totalWeeks: 20 }, // 6w growth + 12w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "parsley",
+    name: "Perejil",
+    emoji: "🌱",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#16a34a",
+    category: "hierbas",
+    timing: { growthWeeks: 8, harvestWeeks: 20, totalWeeks: 32 }, // 8w growth + 20w harvest + 4w buffer
+    varieties: [],
+  },
+  {
+    id: "rosemary",
+    name: "Romero",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#15803d",
+    category: "hierbas",
+    timing: { growthWeeks: 12, harvestWeeks: 52, totalWeeks: 72 }, // 12w growth + 52w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "dill",
+    name: "Eneldo",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#84cc16",
+    category: "hierbas",
+    timing: { growthWeeks: 8, harvestWeeks: 12, totalWeeks: 22 }, // 8w growth + 12w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "sage",
+    name: "Salvia",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#65a30d",
+    category: "hierbas",
+    timing: { growthWeeks: 10, harvestWeeks: 40, totalWeeks: 58 }, // 10w growth + 40w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "oregano",
+    name: "Orégano",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#22c55e",
+    category: "hierbas",
+    timing: { growthWeeks: 8, harvestWeeks: 40, totalWeeks: 56 }, // 8w growth + 40w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "lemon-thyme",
+    name: "Tomillo Limón",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#a3e635",
+    category: "hierbas",
+    timing: { growthWeeks: 10, harvestWeeks: 40, totalWeeks: 58 }, // 10w growth + 40w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "chives",
+    name: "Cebollino",
+    emoji: "🌱",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#84cc16",
+    category: "hierbas",
+    timing: { growthWeeks: 8, harvestWeeks: 30, totalWeeks: 44 }, // 8w growth + 30w harvest + 6w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "stevia",
+    name: "Stevia",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#22c55e",
+    category: "hierbas",
+    timing: { growthWeeks: 12, harvestWeeks: 40, totalWeeks: 60 }, // 12w growth + 40w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "rue",
+    name: "Ruda",
+    emoji: "🌿",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#65a30d",
+    category: "hierbas",
+    timing: { growthWeeks: 10, harvestWeeks: 40, totalWeeks: 58 }, // 10w growth + 40w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+
+  // FLORES (Caléndula, Capuchina, Margarita, Rosa, Altabaca)
+  // Middle zone only - 100cm spacing
+  {
+    id: "calendula",
+    name: "Caléndula",
+    emoji: "🌼",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#f59e0b",
+    category: "flores",
+    timing: { growthWeeks: 8, harvestWeeks: 16, totalWeeks: 26 }, // 8w growth + 16w harvest + 2w buffer
+    varieties: [],
+  },
+  {
+    id: "nasturtium",
+    name: "Capuchina",
+    emoji: "🌺",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#ea580c",
+    category: "flores",
+    timing: { growthWeeks: 6, harvestWeeks: 20, totalWeeks: 30 }, // 6w growth + 20w harvest + 4w buffer
+    varieties: [],
+  },
+  {
+    id: "daisy",
+    name: "Margarita",
+    emoji: "🌼",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#fef3c7",
+    category: "flores",
+    timing: { growthWeeks: 10, harvestWeeks: 20, totalWeeks: 34 }, // 10w growth + 20w harvest + 4w buffer
+    varieties: [],
+  },
+  {
+    id: "rose",
+    name: "Rosa",
+    emoji: "🌹",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#f43f5e",
+    category: "flores",
+    timing: { growthWeeks: 16, harvestWeeks: 40, totalWeeks: 64 }, // 16w growth + 40w harvest + 8w buffer (perennial)
+    varieties: [],
+  },
+  {
+    id: "altabaca",
+    name: "Altabaca",
+    emoji: "🌸",
+    spacingCm: 100, // Middle zone: 1 plant every 100cm
+    color: "#c084fc",
+    category: "flores",
+    timing: { growthWeeks: 8, harvestWeeks: 16, totalWeeks: 26 }, // 8w growth + 16w harvest + 2w buffer
+    varieties: [],
+  },
+
+  // OTROS (Alcachofa, Espárrago)
+  {
+    id: "artichoke",
+    name: "Alcachofa",
+    emoji: "🥬",
+    spacingCm: 75, // 1 plant every 75cm (alternating sides)
+    color: "#65a30d",
+    category: "hojas",
+    timing: { growthWeeks: 24, harvestWeeks: 12, totalWeeks: 40 }, // 24w growth + 12w harvest + 4w buffer
+    varieties: [],
+  },
+  {
+    id: "asparagus",
+    name: "Espárrago",
+    emoji: "🌱",
+    spacingCm: 25, // 1 plant every 25cm (both sides)
+    color: "#84cc16",
+    category: "hojas",
+    timing: { growthWeeks: 52, harvestWeeks: 8, totalWeeks: 68 }, // 52w growth + 8w harvest + 8w buffer (perennial)
     varieties: [],
   },
 ];
@@ -519,6 +703,14 @@ export interface PlantedItem {
   positionCm: number;
   side: "top" | "bottom";
   plantedDate: string; // Fecha ISO de plantación
+}
+
+export interface MiddlePlantItem {
+  id: string;
+  plantId: string;
+  varietyId?: string;
+  positionCm: number;
+  plantedDate: string;
 }
 
 export const DRIPPER_SPACING_CM = 25;
@@ -534,42 +726,59 @@ export interface LineGroup {
   id: string;
   name: string;
   color: string;
+  middlePlants?: MiddlePlantItem[]; // Flores/hierbas entre líneas 2-3 del bancal
 }
 
 export interface GardenConfig {
   lineSeparationCm: number;
   defaultLineLengthCm: number;
   method: "parades-crestall" | "traditional" | "intensive";
+  showLabels: boolean; // Mostrar etiquetas de plantas
+  currentPlantingDate: string; // Fecha ISO para nuevas plantas
   // Parades en Crestall specific config
   groupConfig?: {
-    linesPerGroup: number; // 4 líneas por grupo
-    intraGroupSpacingCm: number; // 40cm entre líneas dentro del grupo
-    interGroupSpacingCm: number; // 60cm entre grupos
+    linesPerGroup: number; // 4 líneas por bancal (2 subgrupos de 2)
+    subgroupSize: number; // 2 líneas por subgrupo
+    subgroupSpacingCm: number; // 40cm entre líneas 1-2 y 3-4
+    middleSpacingCm: number; // 50cm entre líneas 2-3 (para flores/hierbas)
+    interGroupSpacingCm: number; // 60cm entre bancales
     paddingCm: number; // 20cm padding arriba/abajo
+    allowMiddlePlants: boolean; // Permitir flores/hierbas entre líneas 2-3
+    middlePlantSpacingCm: number; // 100cm entre flores/hierbas
   };
 }
 
 export const gardenMethods: Record<string, GardenConfig> = {
   "parades-crestall": {
     lineSeparationCm: 40,
-    defaultLineLengthCm: 300,
+    defaultLineLengthCm: 400,
     method: "parades-crestall",
+    showLabels: true,
+    currentPlantingDate: new Date().toISOString(),
     groupConfig: {
       linesPerGroup: 4,
-      intraGroupSpacingCm: 40,
+      subgroupSize: 2,
+      subgroupSpacingCm: 40,
+      middleSpacingCm: 50,
       interGroupSpacingCm: 60,
       paddingCm: 20,
+      allowMiddlePlants: true,
+      middlePlantSpacingCm: 100,
     },
   },
   traditional: {
     lineSeparationCm: 50,
     defaultLineLengthCm: 400,
     method: "traditional",
+    showLabels: true,
+    currentPlantingDate: new Date().toISOString(),
   },
   intensive: {
     lineSeparationCm: 20,
     defaultLineLengthCm: 200,
     method: "intensive",
+    showLabels: true,
+    currentPlantingDate: new Date().toISOString(),
   },
 };
 
