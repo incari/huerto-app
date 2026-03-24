@@ -1,4 +1,8 @@
-import { Plant, PlantedItem as PlantedItemType, GardenConfig } from "@/lib/plants";
+import {
+  Plant,
+  PlantedItem as PlantedItemType,
+  GardenConfig,
+} from "@/lib/plants";
 
 const PIXELS_PER_CM = 2;
 
@@ -27,7 +31,7 @@ export function PlantedItem({
     <div
       className={`
         absolute -translate-x-1/2 group/plant hover:z-50
-        ${plantedItem.side === "top" ? "top-0" : "bottom-0"}
+        ${plantedItem.side === "top" ? "-top-2" : "-bottom-2"}
       `}
       style={{
         left: plantedItem.positionCm * PIXELS_PER_CM,
@@ -37,13 +41,15 @@ export function PlantedItem({
       onMouseLeave={onMouseLeave}
       onClick={onRemove}
     >
-      <div className="relative flex flex-col items-center">
-        <span className="text-2xl select-none block cursor-pointer">
+      <div
+        className={`relative flex items-center ${plantedItem.side === "bottom" ? "flex-col-reverse" : "flex-col"}`}
+      >
+        <span className="text-2xl select-none block cursor-pointer relative z-20">
           {plant.emoji}
         </span>
 
         {config.showLabels && (
-          <div className="text-[9px] font-medium text-foreground whitespace-nowrap mt-0.5 px-1 py-0.5 bg-background rounded border border-border shadow-sm">
+          <div className="text-[9px] font-medium text-foreground whitespace-nowrap mt-0.5 px-1 py-0.5 bg-background rounded border border-border shadow-sm relative z-10">
             {variety ? variety.name : plant.name}
           </div>
         )}
@@ -80,10 +86,11 @@ export function PlantedItem({
             {plant.name}
             {variety ? ` (${variety.name})` : ""}
           </div>
-          <div className="text-muted-foreground">{plantedItem.positionCm}cm</div>
+          <div className="text-muted-foreground">
+            {plantedItem.positionCm}cm
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
