@@ -1,20 +1,23 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo } from "react";
+import { useRef, useState, useMemo } from "react";
 import {
   Plant,
-  PlantedItem,
   GardenLine,
   GardenConfig,
   LineGroup,
   DRIPPER_SPACING_CM,
-  getPlantSpacing,
 } from "@/lib/plants";
 import { SelectedPlantData } from "@/components/plant-sidebar";
 import { Ruler } from "./garden-canvas/ruler";
 import { Toolbar } from "./garden-canvas/toolbar";
 import { EmptyState } from "./garden-canvas/empty-state";
-import { GardenLineRow } from "./garden-canvas/garden-line-row";
+import { LineGroupContainer } from "./garden-canvas/line-group-container";
+import { GroupSeparator } from "./garden-canvas/group-separator";
+import { PDFPreviewDialog } from "./garden-canvas/pdf-preview-dialog";
+import { usePlantingLogic } from "@/hooks/usePlantingLogic";
+import { useDragAndDrop } from "@/hooks/useDragAndDrop";
+import { useLineManagement } from "@/hooks/useLineManagement";
 
 interface GardenCanvasProps {
   lines: GardenLine[];
@@ -38,15 +41,96 @@ export function GardenCanvas({
   config,
 }: GardenCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [dragOverLine, setDragOverLine] = useState<number | null>(null);
-  const [dragPosition, setDragPosition] = useState<number | null>(null);
-  const [dragSide, setDragSide] = useState<"top" | "bottom">("top");
+  const gardenContentRef = useRef<HTMLDivElement>(null); // Ref for the garden content with background and border
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
-  const [hoverLineIndex, setHoverLineIndex] = useState<number | null>(null);
-  const [hoverSide, setHoverSide] = useState<"top" | "bottom" | null>(null);
-  const [hoverPositionCm, setHoverPositionCm] = useState<number | null>(null);
+
+  // PDF Preview state
+  const [pdfPreview, setPdfPreview] = useState<{
+    open: boolean;
+    blob: Blob | null;
+    fileName: string;
+    title: string;
+  }>({
+    open: false,
+    blob: null,
+    fileName: "",
+    title: "",
+  });
 
   const getPlantById = (id: string) => plants.find((p) => p.id === id);
+
+  // Custom hooks for logic separation
+  const { findNextValidPosition } = usePlantingLogic({ getPlantById });
+
+  const {
+    dragOverLine,
+    dragPosition,
+    dragSide,
+    hoverLineIndex,
+    hoverSide,
+    hoverPositionCm,
+    handleDrop,
+    handleDragOver,
+    handleMouseMove,
+    handleMouseLeave,
+    handleLineClick,
+    setDragOverLine,
+    setDragPosition,
+  } = useDragAndDrop({
+    lines,
+    onLinesChange,
+    selectedPlant,
+    config,
+    findNextValidPosition,
+  });
+
+  const {
+    removePlant,
+    archivePlant,
+    addLine,
+    insertLineAfter,
+    addGroupSeparator,
+    removeLine,
+    clearAll,
+  } = useLineManagement({
+    lines,
+    lineGroups,
+    config,
+    onLinesChange,
+    onLineGroupsChange,
+  });
+
+  // Export full garden as visual (screenshot)
+  const handleExportVisualPDF = async () => {
+    if (typeof window !== "undefined" && gardenContentRef.current) {
+      const { exportFullGardenVisualPDF } =
+        await import("@/lib/pdf-export.client");
+      const result = await exportFullGardenVisualPDF(gardenContentRef.current!);
+
+      setPdfPreview({
+        open: true,
+        blob: result.blob,
+        fileName: result.fileName,
+        title: "Vista Previa - Exportación Visual",
+      });
+    }
+  };
+
+  // Export full garden as table
+  const handleExportTablePDF = async () => {
+    if (typeof window !== "undefined") {
+      const { exportFullGardenTablePDF } =
+        await import("@/lib/pdf-export.client");
+      const result = exportFullGardenTablePDF(lines, plants);
+
+      setPdfPreview({
+        open: true,
+        blob: result.blob,
+        fileName: result.fileName,
+        title: "Vista Previa - Exportación de Datos",
+      });
+    }
+  };
 
   // Calculate line heights based on method
   const getLineSpacing = (
@@ -89,300 +173,6 @@ export function GardenCanvas({
     };
   };
 
-  // Encuentra la siguiente posición válida para una planta
-  const findNextValidPosition = (
-    line: GardenLine,
-    plant: Plant,
-    varietyId: string | undefined,
-    preferredPositionCm: number,
-    side: "top" | "bottom",
-  ): number | null => {
-    const plantsOnSide = line.plants.filter((p) => p.side === side);
-    const plantSpacing = getPlantSpacing(plant, varietyId);
-
-    const searchPositions = (
-      startPos: number,
-      direction: 1 | -1,
-    ): number | null => {
-      let pos = startPos;
-      while (pos >= 0 && pos <= line.lengthCm) {
-        const snapped =
-          Math.round(pos / DRIPPER_SPACING_CM) * DRIPPER_SPACING_CM;
-
-        const hasConflict = plantsOnSide.some((p) => {
-          const existingPlant = getPlantById(p.plantId);
-          if (!existingPlant) return false;
-          const existingSpacing = getPlantSpacing(existingPlant, p.varietyId);
-          const minDistance = (plantSpacing + existingSpacing) / 2;
-          return Math.abs(p.positionCm - snapped) < minDistance;
-        });
-
-        if (!hasConflict && snapped >= 0 && snapped <= line.lengthCm) {
-          return snapped;
-        }
-
-        pos += direction * DRIPPER_SPACING_CM;
-      }
-      return null;
-    };
-
-    const snappedPreferred =
-      Math.round(preferredPositionCm / DRIPPER_SPACING_CM) * DRIPPER_SPACING_CM;
-    const hasConflictAtPreferred = plantsOnSide.some((p) => {
-      const existingPlant = getPlantById(p.plantId);
-      if (!existingPlant) return false;
-      const existingSpacing = getPlantSpacing(existingPlant, p.varietyId);
-      const minDistance = (plantSpacing + existingSpacing) / 2;
-      return Math.abs(p.positionCm - snappedPreferred) < minDistance;
-    });
-
-    if (
-      !hasConflictAtPreferred &&
-      snappedPreferred >= 0 &&
-      snappedPreferred <= line.lengthCm
-    ) {
-      return snappedPreferred;
-    }
-
-    const forward = searchPositions(snappedPreferred + DRIPPER_SPACING_CM, 1);
-    if (forward !== null) return forward;
-
-    return searchPositions(snappedPreferred - DRIPPER_SPACING_CM, -1);
-  };
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent, lineIndex: number) => {
-      e.preventDefault();
-      setDragOverLine(null);
-      setDragPosition(null);
-
-      const plantData = e.dataTransfer.getData("plant");
-      if (!plantData) return;
-
-      const data: SelectedPlantData = JSON.parse(plantData);
-      const plant = data.plant;
-      const variety = data.variety;
-      const line = lines[lineIndex];
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const lineMiddle = rect.height / 2;
-      const side: "top" | "bottom" = y < lineMiddle ? "top" : "bottom";
-      const positionCm = x / PIXELS_PER_CM;
-
-      const validPosition = findNextValidPosition(
-        line,
-        plant,
-        variety?.id,
-        positionCm,
-        side,
-      );
-
-      if (validPosition !== null) {
-        const newPlant: PlantedItem = {
-          id: `${plant.id}-${Date.now()}`,
-          plantId: plant.id,
-          varietyId: variety?.id,
-          lineIndex,
-          positionCm: validPosition,
-          side,
-          plantedDate: config.currentPlantingDate,
-        };
-
-        const newLines = [...lines];
-        newLines[lineIndex] = {
-          ...line,
-          plants: [...line.plants, newPlant].sort(
-            (a, b) => a.positionCm - b.positionCm,
-          ),
-        };
-        onLinesChange(newLines);
-      }
-    },
-    [lines, onLinesChange, plants],
-  );
-
-  const handleDragOver = useCallback(
-    (e: React.DragEvent, lineIndex: number) => {
-      e.preventDefault();
-      setDragOverLine(lineIndex);
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const lineMiddle = rect.height / 2;
-      setDragPosition(Math.round(x / PIXELS_PER_CM));
-      setDragSide(y < lineMiddle ? "top" : "bottom");
-    },
-    [],
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent, lineIndex: number, side: "top" | "bottom") => {
-      if (!selectedPlant) {
-        setHoverLineIndex(null);
-        setHoverSide(null);
-        setHoverPositionCm(null);
-        return;
-      }
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const positionCm = x / PIXELS_PER_CM;
-
-      const line = lines[lineIndex];
-      const validPosition = findNextValidPosition(
-        line,
-        selectedPlant.plant,
-        selectedPlant.variety?.id,
-        positionCm,
-        side,
-      );
-
-      setHoverLineIndex(lineIndex);
-      setHoverSide(side);
-      setHoverPositionCm(validPosition);
-    },
-    [selectedPlant, lines, plants],
-  );
-
-  const handleMouseLeave = useCallback(() => {
-    setHoverLineIndex(null);
-    setHoverSide(null);
-    setHoverPositionCm(null);
-  }, []);
-
-  const handleLineClick = useCallback(
-    (e: React.MouseEvent, lineIndex: number, side: "top" | "bottom") => {
-      if (!selectedPlant) return;
-
-      const line = lines[lineIndex];
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const positionCm = x / PIXELS_PER_CM;
-
-      const validPosition = findNextValidPosition(
-        line,
-        selectedPlant.plant,
-        selectedPlant.variety?.id,
-        positionCm,
-        side,
-      );
-
-      if (validPosition !== null) {
-        const newPlant: PlantedItem = {
-          id: `${selectedPlant.plant.id}-${Date.now()}`,
-          plantId: selectedPlant.plant.id,
-          varietyId: selectedPlant.variety?.id,
-          lineIndex,
-          positionCm: validPosition,
-          side,
-          plantedDate: config.currentPlantingDate,
-        };
-
-        const newLines = [...lines];
-        newLines[lineIndex] = {
-          ...line,
-          plants: [...line.plants, newPlant].sort(
-            (a, b) => a.positionCm - b.positionCm,
-          ),
-        };
-        onLinesChange(newLines);
-      }
-    },
-    [lines, onLinesChange, selectedPlant, plants],
-  );
-
-  const removePlant = useCallback(
-    (lineIndex: number, plantId: string) => {
-      const newLines = [...lines];
-      newLines[lineIndex] = {
-        ...newLines[lineIndex],
-        plants: newLines[lineIndex].plants.filter((p) => p.id !== plantId),
-      };
-      onLinesChange(newLines);
-    },
-    [lines, onLinesChange],
-  );
-
-  const addLine = () => {
-    if (config.method === "parades-crestall" && config.groupConfig) {
-      // Add a new bancal (4 lines) with a new group
-      const newGroupId = `group-${Date.now()}`;
-      const newGroup: LineGroup = {
-        id: newGroupId,
-        name: `Bancal ${lineGroups.length + 1}`,
-        color: ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"][
-          lineGroups.length % 5
-        ],
-      };
-      onLineGroupsChange([...lineGroups, newGroup]);
-
-      // Add 4 lines for the new bancal
-      const newLines: GardenLine[] = [];
-      for (let i = 0; i < config.groupConfig.linesPerGroup; i++) {
-        newLines.push({
-          id: `line-${Date.now()}-${i}`,
-          lengthCm: config.defaultLineLengthCm || 400,
-          plants: [],
-          groupId: newGroupId,
-        });
-      }
-      onLinesChange([...lines, ...newLines]);
-    } else {
-      // Traditional method: add single line
-      const lastGroup = lineGroups[lineGroups.length - 1];
-      const newLine: GardenLine = {
-        id: `line-${Date.now()}`,
-        lengthCm: config.defaultLineLengthCm,
-        plants: [],
-        groupId: lastGroup?.id,
-      };
-      onLinesChange([...lines, newLine]);
-    }
-  };
-
-  const insertLineAfter = (index: number) => {
-    const currentLine = lines[index];
-    const newLine: GardenLine = {
-      id: `line-${Date.now()}`,
-      lengthCm: config.defaultLineLengthCm,
-      plants: [],
-      groupId: currentLine?.groupId,
-    };
-    const newLines = [...lines];
-    newLines.splice(index + 1, 0, newLine);
-    onLinesChange(newLines);
-  };
-
-  const addGroupSeparator = (afterIndex: number) => {
-    const newGroupId = `group-${Date.now()}`;
-    const newGroup: LineGroup = {
-      id: newGroupId,
-      name: `Bancal ${lineGroups.length + 1}`,
-      color: ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"][
-        lineGroups.length % 5
-      ],
-    };
-    onLineGroupsChange([...lineGroups, newGroup]);
-
-    // Update lines after the separator to belong to the new group
-    const newLines = lines.map((line, index) => {
-      if (index > afterIndex) {
-        return { ...line, groupId: newGroupId };
-      }
-      return line;
-    });
-    onLinesChange(newLines);
-  };
-
-  const removeLine = (index: number) => {
-    onLinesChange(lines.filter((_, i) => i !== index));
-  };
-
-  const clearAll = () => {
-    onLinesChange(lines.map((line) => ({ ...line, plants: [] })));
-  };
-
   const maxLineLengthCm = Math.max(
     ...lines.map((l) => l.lengthCm),
     config.defaultLineLengthCm,
@@ -419,54 +209,42 @@ export function GardenCanvas({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-background overflow-hidden">
-      <Toolbar onAddLine={addLine} onClearAll={clearAll} config={config} />
+      <Toolbar
+        onAddLine={addLine}
+        onClearAll={clearAll}
+        onExportVisualPDF={handleExportVisualPDF}
+        onExportTablePDF={handleExportTablePDF}
+        config={config}
+      />
 
       {/* Canvas */}
       <div className="min-h-0 overflow-auto p-6 flex-1" ref={canvasRef}>
         <div className="inline-block">
-          <Ruler
-            maxLineLengthCm={maxLineLengthCm}
-            dripperPositions={dripperPositions}
-          />
-
           {/* Lines container with dotted border */}
-          <div className="inline-block bg-amber-50/50 rounded-xl border-2 border-dashed border-amber-200 p-4 pl-24 pr-8 pb-8">
-            {groupedLines.map((group, groupIndex) => {
-              const groupData = lineGroups.find((g) => g.id === group.groupId);
+          <div className="inline-block bg-amber-50/50 rounded-xl border-2 border-dashed border-amber-200 p-4 pr-8 pb-8">
+            {/* Garden content wrapper - this is what gets exported */}
+            <div ref={gardenContentRef}>
+              <div className="pl-24">
+                <Ruler
+                  maxLineLengthCm={maxLineLengthCm}
+                  dripperPositions={dripperPositions}
+                />
+              </div>
+              <div className="pl-24">
+                {groupedLines.map((group, groupIndex) => {
+                  const groupData = lineGroups.find(
+                    (g) => g.id === group.groupId,
+                  );
 
-              return (
-                <div key={group.groupId} className="relative mb-4">
-                  {/* Group label */}
-                  {groupData && (
-                    <div className="absolute -left-20 top-0 bottom-0 flex items-center">
-                      <div
-                        className="writing-mode-vertical text-xs font-medium px-1 py-2 rounded"
-                        style={{
-                          backgroundColor: groupData.color + "20",
-                          color: groupData.color,
-                          writingMode: "vertical-rl",
-                          textOrientation: "mixed",
-                          transform: "rotate(180deg)",
-                        }}
-                      >
-                        {groupData.name}
-                      </div>
-                    </div>
-                  )}
-
-                  {group.lines.map(({ line, originalIndex }, indexInGroup) => {
-                    const spacing = getLineSpacing(indexInGroup);
-                    const isLastInGroup =
-                      indexInGroup === group.lines.length - 1;
-
-                    return (
-                      <GardenLineRow
-                        key={line.id}
-                        line={line}
-                        originalIndex={originalIndex}
-                        indexInGroup={indexInGroup}
-                        isLastInGroup={isLastInGroup}
-                        spacing={spacing}
+                  return (
+                    <div key={group.groupId}>
+                      <LineGroupContainer
+                        group={group}
+                        groupData={groupData}
+                        lineGroups={lineGroups}
+                        config={config}
+                        dripperPositions={dripperPositions}
+                        plants={plants}
                         dragOverLine={dragOverLine}
                         dragPosition={dragPosition}
                         dragSide={dragSide}
@@ -475,9 +253,8 @@ export function GardenCanvas({
                         hoverSide={hoverSide}
                         hoverPositionCm={hoverPositionCm}
                         selectedPlant={selectedPlant}
-                        config={config}
-                        dripperPositions={dripperPositions}
                         getPlantById={getPlantById}
+                        getLineSpacing={getLineSpacing}
                         onDrop={handleDrop}
                         onDragOver={handleDragOver}
                         onDragLeave={() => {
@@ -488,50 +265,48 @@ export function GardenCanvas({
                         onMouseLeave={handleMouseLeave}
                         onLineClick={handleLineClick}
                         onRemovePlant={removePlant}
+                        onArchivePlant={archivePlant}
                         onInsertLineAfter={insertLineAfter}
                         onAddGroupSeparator={addGroupSeparator}
                         onRemoveLine={removeLine}
                         setHoveredLineIndex={setHoveredLineIndex}
-                        groupData={groupData}
-                        lineGroups={lineGroups}
                         onLineGroupsChange={onLineGroupsChange}
                       />
-                    );
-                  })}
 
-                  {/* Group separator visual - only between groups */}
-                  {groupIndex < groupedLines.length - 1 && (
-                    <div
-                      className="relative border-t-2 border-dashed border-amber-400/50 my-4"
-                      style={{
-                        marginTop: config.groupConfig?.interGroupSpacingCm
-                          ? (config.groupConfig.interGroupSpacingCm / 2) *
-                            PIXELS_PER_CM
-                          : 30,
-                        marginBottom: config.groupConfig?.interGroupSpacingCm
-                          ? (config.groupConfig.interGroupSpacingCm / 2) *
-                            PIXELS_PER_CM
-                          : 30,
-                      }}
-                    >
-                      <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-50 px-3 text-xs text-amber-600 font-medium">
-                        {config.groupConfig?.interGroupSpacingCm || 60}cm
-                      </span>
+                      {/* Group separator visual - only between groups */}
+                      {groupIndex < groupedLines.length - 1 &&
+                        config.groupConfig?.interGroupSpacingCm && (
+                          <GroupSeparator
+                            interGroupSpacingCm={
+                              config.groupConfig.interGroupSpacingCm
+                            }
+                            pixelsPerCm={PIXELS_PER_CM}
+                          />
+                        )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
 
-            {lines.length === 0 && (
-              <EmptyState
-                onAddLine={addLine}
-                defaultLineLengthCm={config.defaultLineLengthCm}
-              />
-            )}
+                {lines.length === 0 && (
+                  <EmptyState
+                    onAddLine={addLine}
+                    defaultLineLengthCm={config.defaultLineLengthCm}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* PDF Preview Dialog */}
+      <PDFPreviewDialog
+        open={pdfPreview.open}
+        onOpenChange={(open) => setPdfPreview((prev) => ({ ...prev, open }))}
+        pdfBlob={pdfPreview.blob}
+        fileName={pdfPreview.fileName}
+        title={pdfPreview.title}
+      />
     </div>
   );
 }

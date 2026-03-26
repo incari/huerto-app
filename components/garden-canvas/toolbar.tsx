@@ -1,14 +1,28 @@
 import { Button } from "@/components/ui/button";
-import { Plus, RotateCcw } from "lucide-react";
+import { Plus, RotateCcw, FileDown, Image, Table } from "lucide-react";
 import { GardenConfig, DRIPPER_SPACING_CM } from "@/lib/plants";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ToolbarProps {
   onAddLine: () => void;
   onClearAll: () => void;
+  onExportVisualPDF?: () => void;
+  onExportTablePDF?: () => void;
   config: GardenConfig;
 }
 
-export function Toolbar({ onAddLine, onClearAll, config }: ToolbarProps) {
+export function Toolbar({
+  onAddLine,
+  onClearAll,
+  onExportVisualPDF,
+  onExportTablePDF,
+  config,
+}: ToolbarProps) {
   return (
     <div className="flex items-center justify-between p-3 border-b border-border bg-card">
       <div className="flex items-center gap-2">
@@ -20,6 +34,30 @@ export function Toolbar({ onAddLine, onClearAll, config }: ToolbarProps) {
           <RotateCcw className="h-4 w-4 mr-1" />
           Limpiar
         </Button>
+        {(onExportVisualPDF || onExportTablePDF) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FileDown className="h-4 w-4 mr-1" />
+                Exportar PDF
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {onExportVisualPDF && (
+                <DropdownMenuItem onClick={onExportVisualPDF}>
+                  <Image className="h-4 w-4 mr-2" />
+                  Exportar como Imagen
+                </DropdownMenuItem>
+              )}
+              {onExportTablePDF && (
+                <DropdownMenuItem onClick={onExportTablePDF}>
+                  <Table className="h-4 w-4 mr-2" />
+                  Exportar como Tabla
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
@@ -37,4 +75,3 @@ export function Toolbar({ onAddLine, onClearAll, config }: ToolbarProps) {
     </div>
   );
 }
-

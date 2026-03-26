@@ -25,9 +25,20 @@ export async function GET(
       .from(plantedItems)
       .where(eq(plantedItems.gardenId, gardenId));
 
+    const parsedConfig = JSON.parse(garden.config);
+    console.log("🔍 [SERVER] GET /api/gardens/" + gardenId);
+    console.log(
+      "🔍 [SERVER] Raw config from DB:",
+      garden.config.substring(0, 200) + "...",
+    );
+    console.log(
+      "🔍 [SERVER] Parsed config lines:",
+      parsedConfig?.lines?.length || 0,
+    );
+
     return NextResponse.json({
       ...garden,
-      config: JSON.parse(garden.config),
+      config: parsedConfig,
       plants,
     });
   } catch (error) {
@@ -49,6 +60,10 @@ export async function PUT(
     const body = await request.json();
     const { name, config, plants } = body;
 
+    console.log("🔧 [SERVER] PUT /api/gardens/" + gardenId);
+    console.log("🔧 [SERVER] Received config:", JSON.stringify(config));
+    console.log("🔧 [SERVER] Config lines:", config?.lines?.length || 0);
+
     const [updatedGarden] = await db
       .update(gardens)
       .set({
@@ -58,6 +73,8 @@ export async function PUT(
       })
       .where(eq(gardens.id, gardenId))
       .returning();
+
+    console.log("🔧 [SERVER] Updated garden config:", updatedGarden.config);
 
     if (!updatedGarden) {
       return NextResponse.json({ error: "Garden not found" }, { status: 404 });
@@ -108,4 +125,3 @@ export async function DELETE(
     );
   }
 }
-

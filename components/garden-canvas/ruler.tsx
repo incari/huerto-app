@@ -10,7 +10,7 @@ interface RulerProps {
 export function Ruler({ maxLineLengthCm, dripperPositions }: RulerProps) {
   return (
     <div
-      className="absolute top-2 left-24 flex items-end h-8"
+      className="relative flex items-end h-8 mb-2"
       style={{ width: maxLineLengthCm * PIXELS_PER_CM }}
     >
       {dripperPositions.map((pos) => (

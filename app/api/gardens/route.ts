@@ -8,7 +8,14 @@ initDb();
 export async function GET() {
   try {
     const allGardens = await db.select().from(gardens);
-    return NextResponse.json(allGardens);
+
+    // Parse the config field for each garden
+    const gardensWithParsedConfig = allGardens.map((garden) => ({
+      ...garden,
+      config: JSON.parse(garden.config),
+    }));
+
+    return NextResponse.json(gardensWithParsedConfig);
   } catch (error) {
     console.error("Error fetching gardens:", error);
     return NextResponse.json(
@@ -56,4 +63,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -695,6 +695,18 @@ export const defaultPlants: Plant[] = [
   },
 ];
 
+// Entrada del historial de plantaciones
+export interface PlantingHistoryEntry {
+  id: string;
+  plantId: string;
+  varietyId?: string;
+  plantedDate: string; // Fecha ISO cuando se plantó
+  removedDate: string; // Fecha ISO cuando se quitó
+  harvestNotes?: string; // Notas del usuario sobre la cosecha
+  yieldAmount?: number; // Cantidad cosechada
+  yieldUnit?: string; // Unidad (kg, unidades, etc)
+}
+
 export interface PlantedItem {
   id: string;
   plantId: string;
@@ -703,6 +715,7 @@ export interface PlantedItem {
   positionCm: number;
   side: "top" | "bottom";
   plantedDate: string; // Fecha ISO de plantación
+  history?: PlantingHistoryEntry[]; // Historial de plantaciones en esta posición
 }
 
 export interface MiddlePlantItem {
@@ -711,6 +724,7 @@ export interface MiddlePlantItem {
   varietyId?: string;
   positionCm: number;
   plantedDate: string;
+  history?: PlantingHistoryEntry[]; // Historial de plantaciones en esta posición
 }
 
 export const DRIPPER_SPACING_CM = 25;
@@ -758,7 +772,7 @@ export const gardenMethods: Record<string, GardenConfig> = {
     groupConfig: {
       linesPerGroup: 4,
       subgroupSize: 2,
-      subgroupSpacingCm: 40,
+      subgroupSpacingCm: 70,
       middleSpacingCm: 50,
       interGroupSpacingCm: 60,
       paddingCm: 20,

@@ -178,19 +178,37 @@ function ExistingMiddlePlant({
   config,
   onRemove,
 }: ExistingMiddlePlantProps) {
+  const variety = plant.varieties.find((v) => v.id === existingPlant.varietyId);
+
   return (
-    <div className="relative group/middle flex flex-col items-center">
-      <span className="text-2xl select-none block cursor-pointer">
+    <div className="relative group/middle">
+      {/* Plant emoji - always visible, fixed size */}
+      <span
+        className="text-2xl select-none cursor-pointer block"
+        style={{
+          width: "32px",
+          height: "32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 30,
+          position: "relative",
+        }}
+      >
         {plant.emoji}
       </span>
 
+      {/* Label - always visible when enabled, absolutely positioned */}
       {config.showLabels && (
-        <div className="text-[9px] font-medium text-foreground whitespace-nowrap mt-0.5 px-1 py-0.5 bg-background rounded border border-border shadow-sm">
-          {plant.varieties.find((v) => v.id === existingPlant.varietyId)
-            ?.name || plant.name}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-0.5 text-[9px] font-medium text-foreground whitespace-nowrap px-1 py-0.5 bg-background/95 backdrop-blur-sm rounded border border-border shadow-sm pointer-events-none"
+          style={{ zIndex: 20 }}
+        >
+          {variety?.name || plant.name}
         </div>
       )}
 
+      {/* Remove button */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -203,13 +221,28 @@ function ExistingMiddlePlant({
           opacity-0 group-hover/middle:opacity-100
           hover:scale-110 transition-all
           text-xs font-bold leading-none
-          shadow-sm z-10
+          shadow-sm
           hidden md:flex
         "
+        style={{ zIndex: 40 }}
         title="Eliminar"
       >
         ×
       </button>
+
+      {/* Detailed tooltip on hover - shows position info */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover/middle:opacity-100 transition-opacity bg-card border text-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none"
+        style={{ zIndex: 50 }}
+      >
+        <div className="font-medium">
+          {plant.name}
+          {variety ? ` (${variety.name})` : ""}
+        </div>
+        <div className="text-muted-foreground">
+          {existingPlant.positionCm}cm
+        </div>
+      </div>
     </div>
   );
 }

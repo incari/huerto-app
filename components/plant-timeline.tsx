@@ -350,7 +350,7 @@ export function PlantTimeline({
                     >
                       {/* Growth phase */}
                       <div
-                        className={`absolute top-3 h-4 rounded-l-full ${isPast(dates.harvestStart) ? "bg-amber-300" : "bg-amber-400"}`}
+                        className={`absolute top-3 h-4 rounded-l-full ${isPast(dates.harvestStart) ? "bg-red-300" : "bg-green-400"}`}
                         style={{ left: growthBar.left, width: growthBar.width }}
                         title={`Crecimiento: ${timing.growthWeeks} semanas`}
                       >
