@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import { PlantSidebar, SelectedPlantData } from "@/components/plant-sidebar";
-import { GardenCanvas } from "@/components/garden-canvas";
-import { ConfigPanel } from "@/components/config-panel";
+import {
+  GardenPlanner,
+  BuildPalette,
+  PlantPalette,
+  usePlannerStore,
+} from "@/components/garden-planner";
 import { PlantManager } from "@/components/plant-manager";
 import { PlantTimeline } from "@/components/plant-timeline";
 import { SaveLoadDialog } from "@/components/save-load-dialog";
@@ -16,14 +20,7 @@ import {
   LineGroup,
   gardenMethods,
 } from "@/lib/plants";
-import {
-  Sprout,
-  Info,
-  Layers,
-  Calendar,
-  Menu,
-  Settings as SettingsIcon,
-} from "lucide-react";
+import { Sprout, Info, Layers, Calendar, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -66,7 +63,6 @@ export default function GardenPlannerPage() {
   const [managerOpen, setManagerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("garden");
   const [plantSidebarOpen, setPlantSidebarOpen] = useState(false);
-  const [configPanelOpen, setConfigPanelOpen] = useState(false);
 
   const handleDragStart = (data: SelectedPlantData) => {
     setSelectedPlant(data);
@@ -172,16 +168,6 @@ export default function GardenPlannerPage() {
             saveStatus={saveStatus}
           />
 
-          {/* Mobile config button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setConfigPanelOpen(true)}
-          >
-            <SettingsIcon className="h-5 w-5" />
-          </Button>
-
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="hidden sm:flex">
@@ -276,18 +262,26 @@ export default function GardenPlannerPage() {
             />
           </SheetContent>
         </Sheet>
-
-        {/* Desktop Plant Sidebar */}
+        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
-          <PlantSidebar
-            plants={plants}
-            onDragStart={handleDragStart}
-            selectedPlant={selectedPlant}
-            onSelectPlant={setSelectedPlant}
-            onOpenManager={() => setManagerOpen(true)}
-          />
+          {activeTab === "garden" ? (
+            <PlannerSidebar
+              plants={plants}
+              onDragStart={handleDragStart}
+              selectedPlant={selectedPlant}
+              onSelectPlant={setSelectedPlant}
+              onOpenManager={() => setManagerOpen(true)}
+            />
+          ) : (
+            <PlantSidebar
+              plants={plants}
+              onDragStart={handleDragStart}
+              selectedPlant={selectedPlant}
+              onSelectPlant={setSelectedPlant}
+              onOpenManager={() => setManagerOpen(true)}
+            />
+          )}
         </div>
-
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Selected Plant Indicator */}
           {selectedPlant && (
@@ -338,15 +332,7 @@ export default function GardenPlannerPage() {
               value="garden"
               className="flex-1 min-h-0 mt-0 overflow-hidden"
             >
-              <GardenCanvas
-                lines={lines}
-                plants={plants}
-                lineGroups={lineGroups}
-                onLinesChange={setLines}
-                onLineGroupsChange={setLineGroups}
-                selectedPlant={selectedPlant}
-                config={config}
-              />
+              <GardenPlanner />
             </TabsContent>
 
             <TabsContent
@@ -356,38 +342,6 @@ export default function GardenPlannerPage() {
               <PlantTimeline lines={lines} plants={plants} />
             </TabsContent>
           </Tabs>
-        </div>
-
-        {/* Mobile Config Panel - Sheet/Drawer */}
-        <Sheet open={configPanelOpen} onOpenChange={setConfigPanelOpen}>
-          <SheetContent
-            side="right"
-            className="p-0 w-80"
-            aria-describedby="config-panel-description"
-          >
-            <SheetHeader className="sr-only">
-              <SheetTitle>Configuración</SheetTitle>
-              <p id="config-panel-description" className="sr-only">
-                Configura el método de cultivo y espaciamiento
-              </p>
-            </SheetHeader>
-            <ConfigPanel
-              config={config}
-              onConfigChange={setConfig}
-              plantCount={plantCount}
-              lineCount={lines.length}
-            />
-          </SheetContent>
-        </Sheet>
-
-        {/* Desktop Config Panel */}
-        <div className="hidden lg:block">
-          <ConfigPanel
-            config={config}
-            onConfigChange={setConfig}
-            plantCount={plantCount}
-            lineCount={lines.length}
-          />
         </div>
       </div>
 
@@ -400,4 +354,22 @@ export default function GardenPlannerPage() {
       />
     </div>
   );
+}
+
+interface PlannerSidebarProps {
+  plants: Plant[];
+  onDragStart: (data: SelectedPlantData) => void;
+  selectedPlant: SelectedPlantData | null;
+  onSelectPlant: (data: SelectedPlantData | null) => void;
+  onOpenManager: () => void;
+}
+
+function PlannerSidebar(_props: PlannerSidebarProps) {
+  const plannerMode = usePlannerStore((s) => s.mode);
+
+  if (plannerMode === "plant") {
+    return <PlantPalette />;
+  }
+
+  return <BuildPalette />;
 }
