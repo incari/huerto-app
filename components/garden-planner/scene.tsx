@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { Edges, Grid } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Plane, Vector3 } from "three";
-import { usePlannerStore } from "./store";
+import {
+  Group,
+  LatheGeometry,
+  Plane,
+  Vector2,
+  Vector3,
+  type Camera,
+  type Raycaster,
+} from "three";
+import {
+  clampBedToPlot,
+  clampIrrigationToPlot,
+  clampPlantToPlot,
+  usePlannerStore,
+} from "./store";
 import {
   Bed,
   DEFAULT_DRIP_DROP_RADIUS_CM,
@@ -12,10 +25,12 @@ import {
   DEFAULT_PLANT_STAGE,
   Irrigation,
   PLANT_KIND_SPECS,
+  PLANT_STAGE_SPECS,
   PlantItem,
+  PlantKind,
   PlantStage,
+  PlantStageSpec,
   Plot,
-  TOMATO_STAGE_SPECS,
 } from "./types";
 
 const CM_TO_M = 0.01;
@@ -128,6 +143,47 @@ if (typeof window !== "undefined") {
   window.addEventListener("keyup", onUp);
 }
 
+const HIT_SCRATCH = new Vector3();
+type DragTickCtx = {
+  raycaster: Raycaster;
+  pointer: Vector2;
+  camera: Camera;
+  hit: Vector3;
+};
+type DragTick = (ctx: DragTickCtx) => void;
+let activeDragTick: DragTick | null = null;
+function setActiveDragTick(fn: DragTick | null) {
+  activeDragTick = fn;
+}
+
+export function DragController() {
+  const raycaster = useThree((s) => s.raycaster);
+  const pointer = useThree((s) => s.pointer);
+  const camera = useThree((s) => s.camera);
+  useFrame(() => {
+    if (!activeDragTick) return;
+    raycaster.setFromCamera(pointer, camera);
+    if (!raycaster.ray.intersectPlane(GROUND, HIT_SCRATCH)) return;
+    activeDragTick({ raycaster, pointer, camera, hit: HIT_SCRATCH });
+  });
+  return null;
+}
+
+export function ShadowOptimizer() {
+  const gl = useThree((s) => s.gl);
+  const isDragging = usePlannerStore((s) => s.isDragging);
+  useEffect(() => {
+    if (!gl?.shadowMap) return;
+    if (isDragging) {
+      gl.shadowMap.autoUpdate = false;
+    } else {
+      gl.shadowMap.autoUpdate = true;
+      gl.shadowMap.needsUpdate = true;
+    }
+  }, [isDragging, gl]);
+  return null;
+}
+
 export function Ground() {
   const plot = usePlannerStore((s) => s.plot);
   const select = usePlannerStore((s) => s.select);
@@ -182,15 +238,28 @@ function intersectGround(e: ThreeEvent<PointerEvent>) {
   return e.ray.intersectPlane(GROUND, out) ? out : null;
 }
 
-function BedMesh({ bed, selected }: BedMeshProps) {
+function BedMeshImpl({ bed, selected }: BedMeshProps) {
   const select = usePlannerStore((s) => s.select);
+  const toggleSelection = usePlannerStore((s) => s.toggleSelection);
   const updateBed = usePlannerStore((s) => s.updateBed);
+  const translateItems = usePlannerStore((s) => s.translateItems);
   const setDragging = usePlannerStore((s) => s.setDragging);
+  const pauseHistory = usePlannerStore((s) => s.pauseHistory);
+  const commitHistory = usePlannerStore((s) => s.commitHistory);
   const mode = usePlannerStore((s) => s.mode);
   const cameraMode = usePlannerStore((s) => s.camera);
+  const lockBeds = usePlannerStore((s) => s.lockBeds);
+  const isLocked = bed.locked === true || lockBeds;
 
-  const dragRef = useRef<DragState | null>(null);
-  const { raycaster, pointer, camera } = useThree();
+  const groupRef = useRef<Group>(null);
+  const dragRef = useRef<
+    | (DragState & {
+        multiIds?: string[];
+        lastDxCm?: number;
+        lastDyCm?: number;
+      })
+    | null
+  >(null);
 
   const w = bed.widthCm * CM_TO_M;
   const d = bed.depthCm * CM_TO_M;
@@ -202,9 +271,17 @@ function BedMesh({ bed, selected }: BedMeshProps) {
     handle?: HandleId,
   ) => {
     e.stopPropagation();
+    if (e.nativeEvent.shiftKey && kind === "move") {
+      toggleSelection(bed.id);
+      return;
+    }
     select(bed.id);
+    const s = usePlannerStore.getState();
+    if (s.lockBeds || bed.locked) return;
     const hit = intersectGround(e);
     if (!hit) return;
+    const ids = s.selectedIds.includes(bed.id) ? s.selectedIds : [bed.id];
+    const multiIds = kind === "move" && ids.length > 1 ? ids : undefined;
     dragRef.current = {
       kind,
       handle,
@@ -212,76 +289,111 @@ function BedMesh({ bed, selected }: BedMeshProps) {
       startHit: { x: hit.x, z: hit.z },
       lastX: bed.x,
       lastY: bed.y,
+      multiIds,
+      lastDxCm: 0,
+      lastDyCm: 0,
     };
+    pauseHistory();
     setDragging(true);
-  };
-
-  useFrame(() => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    raycaster.setFromCamera(pointer, camera);
-    const hit = new Vector3();
-    if (!raycaster.ray.intersectPlane(GROUND, hit)) return;
-    const dxM = hit.x - drag.startHit.x;
-    const dzM = hit.z - drag.startHit.z;
-    if (drag.kind === "move") {
-      const state = usePlannerStore.getState();
-      const others = state.beds.filter((b) => b.id !== bed.id);
-      let candX = drag.startBed.x + dxM / CM_TO_M;
-      let candY = drag.startBed.y + dzM / CM_TO_M;
-      if (!modifiers.shift) {
-        const snapped = snapMove(
-          drag.startBed,
-          candX,
-          candY,
-          others,
-          state.plot,
-        );
-        candX = snapped.x;
-        candY = snapped.y;
-      }
-      if (!modifiers.alt) {
-        const otherBoxes = others.map(bedAABB);
-        const collides = (x: number, y: number) => {
-          const box = bedAABB({ ...drag.startBed, x, y });
-          return otherBoxes.some((o) => aabbOverlap(box, o));
-        };
-        if (collides(candX, candY)) {
-          if (!collides(candX, drag.lastY)) {
-            candY = drag.lastY;
-          } else if (!collides(drag.lastX, candY)) {
-            candX = drag.lastX;
-          } else {
-            candX = drag.lastX;
-            candY = drag.lastY;
+    setActiveDragTick(({ hit }) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const dxM = hit.x - drag.startHit.x;
+      const dzM = hit.z - drag.startHit.z;
+      if (drag.kind === "move") {
+        if (drag.multiIds) {
+          const dxCm = dxM / CM_TO_M;
+          const dyCm = dzM / CM_TO_M;
+          const stepX = dxCm - (drag.lastDxCm ?? 0);
+          const stepY = dyCm - (drag.lastDyCm ?? 0);
+          drag.lastDxCm = dxCm;
+          drag.lastDyCm = dyCm;
+          if (stepX !== 0 || stepY !== 0) {
+            translateItems(drag.multiIds, stepX, stepY);
+          }
+          return;
+        }
+        const state = usePlannerStore.getState();
+        const others = state.beds.filter((b) => b.id !== bed.id);
+        let candX = drag.startBed.x + dxM / CM_TO_M;
+        let candY = drag.startBed.y + dzM / CM_TO_M;
+        if (!modifiers.shift) {
+          const snapped = snapMove(
+            drag.startBed,
+            candX,
+            candY,
+            others,
+            state.plot,
+          );
+          candX = snapped.x;
+          candY = snapped.y;
+        }
+        if (!modifiers.alt) {
+          const otherBoxes = others.map(bedAABB);
+          const collides = (x: number, y: number) => {
+            const box = bedAABB({ ...drag.startBed, x, y });
+            return otherBoxes.some((o) => aabbOverlap(box, o));
+          };
+          if (collides(candX, candY)) {
+            if (!collides(candX, drag.lastY)) {
+              candY = drag.lastY;
+            } else if (!collides(drag.lastX, candY)) {
+              candX = drag.lastX;
+            } else {
+              candX = drag.lastX;
+              candY = drag.lastY;
+            }
           }
         }
+        const clamped = clampBedToPlot(
+          { ...drag.startBed, x: candX, y: candY },
+          state.plot,
+        );
+        drag.lastX = clamped.x;
+        drag.lastY = clamped.y;
+        if (groupRef.current) {
+          groupRef.current.position.x = clamped.x * CM_TO_M;
+          groupRef.current.position.z = clamped.y * CM_TO_M;
+        }
+        return;
       }
-      drag.lastX = candX;
-      drag.lastY = candY;
-      updateBed(bed.id, { x: candX, y: candY });
-      return;
-    }
-    if (drag.kind === "resize" && drag.handle) {
-      applyResize(drag, dxM, dzM, (patch) => updateBed(bed.id, patch));
-    }
-  });
+      if (drag.kind === "resize" && drag.handle) {
+        applyResize(drag, dxM, dzM, (patch) => updateBed(bed.id, patch));
+      }
+    });
+  };
 
   useEffect(() => {
     const up = () => {
-      if (!dragRef.current) return;
+      const drag = dragRef.current;
+      if (!drag) return;
+      const wasSingleMove = drag.kind === "move" && !drag.multiIds;
+      const finalX = drag.lastX;
+      const finalY = drag.lastY;
       dragRef.current = null;
+      setActiveDragTick(null);
       setDragging(false);
+      if (
+        wasSingleMove &&
+        (finalX !== drag.startBed.x || finalY !== drag.startBed.y)
+      ) {
+        updateBed(bed.id, { x: finalX, y: finalY });
+      }
+      commitHistory();
     };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
-  }, [setDragging]);
+  }, [setDragging, commitHistory, updateBed, bed.id]);
 
-  const showHandles = selected && mode === "design" && cameraMode === "2d";
+  const showHandles =
+    selected && mode === "design" && cameraMode === "2d" && !isLocked;
   const handleSize = 0.12;
+  const selectColor = isLocked ? "#64748b" : "#c2410c";
+  const edgeColor = selected ? (isLocked ? "#fbbf24" : "#fb923c") : "#1f2937";
 
   return (
     <group
+      ref={groupRef}
       position={[bed.x * CM_TO_M, 0, bed.y * CM_TO_M]}
       rotation={[0, bed.rotation, 0]}
     >
@@ -293,12 +405,12 @@ function BedMesh({ bed, selected }: BedMeshProps) {
       >
         <boxGeometry args={[w, h, d]} />
         <meshStandardMaterial
-          color={selected ? "#c2410c" : "#8b5a2b"}
+          color={selected ? selectColor : "#8b5a2b"}
           roughness={0.9}
         />
         <Edges
           threshold={1}
-          color={selected ? "#fb923c" : "#1f2937"}
+          color={edgeColor}
           lineWidth={selected ? 2.5 : 1.5}
         />
       </mesh>
@@ -316,6 +428,8 @@ function BedMesh({ bed, selected }: BedMeshProps) {
     </group>
   );
 }
+
+const BedMesh = memo(BedMeshImpl);
 
 const HANDLE_POSITIONS: { id: HandleId; sx: -1 | 0 | 1; sz: -1 | 0 | 1 }[] = [
   { id: "nw", sx: -1, sz: -1 },
@@ -369,11 +483,11 @@ function applyResize(
 
 export function Beds() {
   const beds = usePlannerStore((s) => s.beds);
-  const selectedId = usePlannerStore((s) => s.selectedId);
+  const selectedIds = usePlannerStore((s) => s.selectedIds);
   return (
     <>
       {beds.map((b) => (
-        <BedMesh key={b.id} bed={b} selected={b.id === selectedId} />
+        <BedMesh key={b.id} bed={b} selected={selectedIds.includes(b.id)} />
       ))}
     </>
   );
@@ -425,18 +539,29 @@ interface IrrigationMeshProps {
   selected: boolean;
 }
 
-function IrrigationMesh({ irr, selected }: IrrigationMeshProps) {
+function IrrigationMeshImpl({ irr, selected }: IrrigationMeshProps) {
   const select = usePlannerStore((s) => s.select);
+  const toggleSelection = usePlannerStore((s) => s.toggleSelection);
   const updateIrrigation = usePlannerStore((s) => s.updateIrrigation);
+  const translateItems = usePlannerStore((s) => s.translateItems);
   const setDragging = usePlannerStore((s) => s.setDragging);
+  const pauseHistory = usePlannerStore((s) => s.pauseHistory);
+  const commitHistory = usePlannerStore((s) => s.commitHistory);
   const cameraMode = usePlannerStore((s) => s.camera);
   const beds = usePlannerStore((s) => s.beds);
+  const lockIrrigations = usePlannerStore((s) => s.lockIrrigations);
+  const isLocked = irr.locked === true || lockIrrigations;
 
+  const groupRef = useRef<Group>(null);
   const dragRef = useRef<{
     startIrr: Irrigation;
     startHit: { x: number; z: number };
+    multiIds?: string[];
+    lastDxCm: number;
+    lastDyCm: number;
+    lastX: number;
+    lastY: number;
   } | null>(null);
-  const { raycaster, pointer, camera } = useThree();
 
   const color = IRR_COLORS[irr.kind];
   const isLinear = irr.kind === "drip" || irr.kind === "soaker";
@@ -469,45 +594,94 @@ function IrrigationMesh({ irr, selected }: IrrigationMeshProps) {
 
   const beginDrag = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    if (e.nativeEvent.shiftKey) {
+      toggleSelection(irr.id);
+      return;
+    }
     select(irr.id);
+    const s = usePlannerStore.getState();
+    if (s.lockIrrigations || irr.locked) return;
     const hit = intersectGround(e);
     if (!hit) return;
+    const ids = s.selectedIds.includes(irr.id) ? s.selectedIds : [irr.id];
     dragRef.current = {
       startIrr: { ...irr },
       startHit: { x: hit.x, z: hit.z },
+      multiIds: ids.length > 1 ? ids : undefined,
+      lastDxCm: 0,
+      lastDyCm: 0,
+      lastX: irr.x,
+      lastY: irr.y,
     };
+    pauseHistory();
     setDragging(true);
-  };
-
-  useFrame(() => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    raycaster.setFromCamera(pointer, camera);
-    const hit = new Vector3();
-    if (!raycaster.ray.intersectPlane(GROUND, hit)) return;
-    const dxM = hit.x - drag.startHit.x;
-    const dzM = hit.z - drag.startHit.z;
-    updateIrrigation(irr.id, {
-      x: drag.startIrr.x + dxM / CM_TO_M,
-      y: drag.startIrr.y + dzM / CM_TO_M,
+    setActiveDragTick(({ hit }) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const dxM = hit.x - drag.startHit.x;
+      const dzM = hit.z - drag.startHit.z;
+      const dxCm = dxM / CM_TO_M;
+      const dyCm = dzM / CM_TO_M;
+      if (drag.multiIds) {
+        const stepX = dxCm - drag.lastDxCm;
+        const stepY = dyCm - drag.lastDyCm;
+        drag.lastDxCm = dxCm;
+        drag.lastDyCm = dyCm;
+        if (stepX !== 0 || stepY !== 0) {
+          translateItems(drag.multiIds, stepX, stepY);
+        }
+        return;
+      }
+      const state = usePlannerStore.getState();
+      const clamped = clampIrrigationToPlot(
+        {
+          ...drag.startIrr,
+          x: drag.startIrr.x + dxCm,
+          y: drag.startIrr.y + dyCm,
+        },
+        state.plot,
+      );
+      drag.lastX = clamped.x;
+      drag.lastY = clamped.y;
+      if (groupRef.current) {
+        groupRef.current.position.x = clamped.x * CM_TO_M;
+        groupRef.current.position.z = clamped.y * CM_TO_M;
+        groupRef.current.position.y = irrigationBaseY(
+          { ...drag.startIrr, x: clamped.x, y: clamped.y },
+          state.beds,
+        );
+      }
     });
-  });
+  };
 
   useEffect(() => {
     const up = () => {
-      if (!dragRef.current) return;
+      const drag = dragRef.current;
+      if (!drag) return;
+      const wasSingleMove = !drag.multiIds;
+      const finalX = drag.lastX;
+      const finalY = drag.lastY;
       dragRef.current = null;
+      setActiveDragTick(null);
       setDragging(false);
+      if (
+        wasSingleMove &&
+        (finalX !== drag.startIrr.x || finalY !== drag.startIrr.y)
+      ) {
+        updateIrrigation(irr.id, { x: finalX, y: finalY });
+      }
+      commitHistory();
     };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
-  }, [setDragging]);
+  }, [setDragging, commitHistory, updateIrrigation, irr.id]);
 
-  const outline = selected ? "#fb923c" : color;
+  const outline = selected ? (isLocked ? "#fbbf24" : "#fb923c") : color;
   const emitterY = cameraMode === "2d" ? 0.02 : 0.1;
 
   return (
     <group
+      ref={groupRef}
       position={[irr.x * CM_TO_M, baseY, irr.y * CM_TO_M]}
       rotation={[0, irr.rotation, 0]}
       onPointerDown={beginDrag}
@@ -582,13 +756,19 @@ function IrrigationMesh({ irr, selected }: IrrigationMeshProps) {
   );
 }
 
+const IrrigationMesh = memo(IrrigationMeshImpl);
+
 export function Irrigations() {
   const irrigations = usePlannerStore((s) => s.irrigations);
-  const selectedId = usePlannerStore((s) => s.selectedId);
+  const selectedIds = usePlannerStore((s) => s.selectedIds);
   return (
     <>
       {irrigations.map((i) => (
-        <IrrigationMesh key={i.id} irr={i} selected={i.id === selectedId} />
+        <IrrigationMesh
+          key={i.id}
+          irr={i}
+          selected={selectedIds.includes(i.id)}
+        />
       ))}
     </>
   );
@@ -639,7 +819,7 @@ function pickFruitColor(rnd: () => number, ripeness: number): string {
 }
 
 function buildTomato(id: string, stage: PlantStage): TomatoStructure {
-  const spec = TOMATO_STAGE_SPECS[stage];
+  const spec = PLANT_STAGE_SPECS.tomato[stage];
   const rnd = mulberry32(hashSeed(id) ^ (stage * 0x9e3779b1));
   const heightM = spec.heightCm * CM_TO_M;
   const canopyR = (spec.canopyCm / 2) * CM_TO_M;
@@ -679,7 +859,7 @@ function buildTomato(id: string, stage: PlantStage): TomatoStructure {
   }
 
   const stemLeaves: TomatoStructure["stemLeaves"] = [];
-  for (let i = 0; i < spec.stemLeafCount; i++) {
+  for (let i = 0; i < spec.leafCount; i++) {
     stemLeaves.push({
       t: 0.1 + rnd() * 0.85,
       azimuth: rnd() * Math.PI * 2,
@@ -801,73 +981,724 @@ function TomatoPlant({ structure, stage, hasStake }: TomatoPlantProps) {
   );
 }
 
+interface KindRenderProps {
+  id: string;
+  stage: PlantStage;
+  spec: PlantStageSpec;
+  fruitColor: string;
+  heightM: number;
+  canopyR: number;
+}
+
+let PEPPER_UNIT_GEOM: LatheGeometry | null = null;
+function getPepperUnitGeom(): LatheGeometry {
+  if (PEPPER_UNIT_GEOM) return PEPPER_UNIT_GEOM;
+  // Profile along Y from tip (-1) to shoulder (0). Revolved around Y axis.
+  // Slight lobed bell-pepper silhouette with a pinched shoulder.
+  const pts: Vector2[] = [
+    new Vector2(0.0, -1.0),
+    new Vector2(0.18, -0.92),
+    new Vector2(0.32, -0.78),
+    new Vector2(0.42, -0.6),
+    new Vector2(0.47, -0.4),
+    new Vector2(0.48, -0.2),
+    new Vector2(0.46, -0.05),
+    new Vector2(0.42, 0.05),
+    new Vector2(0.36, 0.12),
+    new Vector2(0.3, 0.14),
+  ];
+  PEPPER_UNIT_GEOM = new LatheGeometry(pts, 16);
+  return PEPPER_UNIT_GEOM;
+}
+
+interface PepperFruitProps {
+  size: number;
+  color: string;
+  elongation?: number;
+  tilt?: number;
+  azimuth?: number;
+}
+
+function PepperFruit({
+  size,
+  color,
+  elongation = 1,
+  tilt = 0,
+  azimuth = 0,
+}: PepperFruitProps) {
+  const geom = getPepperUnitGeom();
+  // Unit profile spans y in [-1, 0.14]; total length ~1.14. Scale to size.
+  const capR = size * 0.12;
+  const stalkLen = size * 0.28;
+  return (
+    <group rotation={[0, azimuth, tilt]}>
+      <mesh
+        geometry={geom}
+        scale={[size * 0.55, size * elongation, size * 0.55]}
+        castShadow
+      >
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0.05} />
+      </mesh>
+      <mesh position={[0, size * 0.16, 0]} castShadow>
+        <cylinderGeometry args={[capR, capR * 1.3, size * 0.1, 8]} />
+        <meshStandardMaterial color="#4d7c0f" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, size * 0.16 + stalkLen / 2, 0]} castShadow>
+        <cylinderGeometry args={[capR * 0.45, capR * 0.55, stalkLen, 6]} />
+        <meshStandardMaterial color="#65a30d" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+function BushyPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+  fruitShape,
+}: KindRenderProps & { fruitShape: "sphere" | "oval" | "pepper" }) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x85ebca77)),
+    [id, stage],
+  );
+  const stemR =
+    stage === 1 ? 0.006 : stage === 2 ? 0.008 : stage === 3 ? 0.011 : 0.014;
+  const branches = useMemo(() => {
+    const out: { azimuth: number; tilt: number; length: number }[] = [];
+    for (let i = 0; i < spec.branchCount; i++) {
+      out.push({
+        azimuth:
+          i * ((Math.PI * 2) / Math.max(1, spec.branchCount)) + rnd() * 0.5,
+        tilt: 0.7 + rnd() * 0.35,
+        length: canopyR * (0.8 + rnd() * 0.35),
+      });
+    }
+    return out;
+  }, [rnd, spec.branchCount, canopyR]);
+  const fruits = useMemo(() => {
+    const out: {
+      azimuth: number;
+      t: number;
+      size: number;
+      spin: number;
+      tilt: number;
+      elongation: number;
+    }[] = [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      out.push({
+        azimuth: rnd() * Math.PI * 2,
+        t: 0.55 + rnd() * 0.35,
+        size: 0.04 + rnd() * 0.025,
+        spin: rnd() * Math.PI * 2,
+        tilt: (rnd() - 0.5) * 0.6,
+        elongation: 0.9 + rnd() * 0.35,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount]);
+  return (
+    <group>
+      {spec.hasStake && (
+        <mesh position={[-0.02, heightM * 0.52, 0]} castShadow>
+          <cylinderGeometry args={[0.006, 0.006, heightM * 1.04, 6]} />
+          <meshStandardMaterial color={STAKE_COLOR} roughness={0.95} />
+        </mesh>
+      )}
+      <mesh position={[0, heightM / 2, 0]} castShadow>
+        <cylinderGeometry args={[stemR * 0.7, stemR, heightM, 8]} />
+        <meshStandardMaterial color={STEM_GREEN} roughness={0.9} />
+      </mesh>
+      {branches.map((b, i) => (
+        <group
+          key={`bb-${i}`}
+          position={[0, heightM * (0.55 + (i % 3) * 0.1), 0]}
+          rotation={[0, b.azimuth, 0]}
+        >
+          <group rotation={[0, 0, -b.tilt]}>
+            <mesh position={[0, b.length / 2, 0]} castShadow>
+              <cylinderGeometry
+                args={[stemR * 0.5, stemR * 0.6, b.length, 6]}
+              />
+              <meshStandardMaterial color={STEM_GREEN} roughness={0.9} />
+            </mesh>
+            <group
+              position={[0, b.length * 0.9, 0]}
+              rotation={[0, 0, Math.PI / 2]}
+            >
+              <Leaf scale={0.9} />
+            </group>
+          </group>
+        </group>
+      ))}
+      {fruits.map((f, i) => {
+        const x = Math.cos(f.azimuth) * canopyR * 0.55;
+        const z = Math.sin(f.azimuth) * canopyR * 0.55;
+        const y = heightM * f.t;
+        if (fruitShape === "pepper") {
+          return (
+            <group key={`fr-${i}`} position={[x, y, z]}>
+              <PepperFruit
+                size={f.size}
+                color={fruitColor}
+                elongation={f.elongation}
+                tilt={f.tilt}
+                azimuth={f.spin}
+              />
+            </group>
+          );
+        }
+        if (fruitShape === "oval") {
+          return (
+            <group
+              key={`fr-${i}`}
+              position={[x, y, z]}
+              rotation={[f.tilt, f.spin, 0]}
+            >
+              <mesh
+                scale={[0.75, 1.55, 0.75]}
+                position={[0, -f.size * 0.4, 0]}
+                castShadow
+              >
+                <sphereGeometry args={[f.size * 0.55, 16, 12]} />
+                <meshStandardMaterial color={fruitColor} roughness={0.25} />
+              </mesh>
+              <mesh position={[0, 0, 0]} castShadow>
+                <coneGeometry args={[f.size * 0.35, f.size * 0.25, 6]} />
+                <meshStandardMaterial color="#4d7c0f" roughness={0.85} />
+              </mesh>
+            </group>
+          );
+        }
+        return (
+          <mesh key={`fr-${i}`} position={[x, y, z]} castShadow>
+            <sphereGeometry args={[f.size * 0.5, 12, 10]} />
+            <meshStandardMaterial color={fruitColor} roughness={0.35} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function VineClimbPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+  podShape,
+}: KindRenderProps & { podShape: "long" | "flat" }) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0xc2b2ae35)),
+    [id, stage],
+  );
+  const stemR = 0.006 + stage * 0.002;
+  const leaves = useMemo(() => {
+    const out: { t: number; azimuth: number; scale: number }[] = [];
+    for (let i = 0; i < spec.leafCount; i++) {
+      out.push({
+        t:
+          0.1 + (i / Math.max(1, spec.leafCount)) * 0.85 + (rnd() - 0.5) * 0.05,
+        azimuth: rnd() * Math.PI * 2,
+        scale: 0.7 + rnd() * 0.5,
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount]);
+  const fruits = useMemo(() => {
+    const out: { t: number; azimuth: number; length: number }[] = [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      out.push({
+        t: 0.4 + rnd() * 0.4,
+        azimuth: rnd() * Math.PI * 2,
+        length: podShape === "long" ? 0.09 + rnd() * 0.05 : 0.06 + rnd() * 0.03,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount, podShape]);
+  return (
+    <group>
+      {spec.hasStake && (
+        <mesh position={[0, heightM * 0.52, 0]} castShadow>
+          <cylinderGeometry args={[0.007, 0.007, heightM * 1.04, 6]} />
+          <meshStandardMaterial color={STAKE_COLOR} roughness={0.95} />
+        </mesh>
+      )}
+      <mesh position={[0, heightM / 2, 0]} castShadow>
+        <cylinderGeometry args={[stemR * 0.7, stemR, heightM, 8]} />
+        <meshStandardMaterial color={STEM_GREEN} roughness={0.85} />
+      </mesh>
+      {leaves.map((l, i) => (
+        <group
+          key={`vl-${i}`}
+          position={[0, l.t * heightM, 0]}
+          rotation={[0, l.azimuth, 0]}
+        >
+          <group position={[canopyR * 0.35, 0, 0]} rotation={[0, 0, -0.7]}>
+            <Leaf scale={l.scale} />
+          </group>
+        </group>
+      ))}
+      {fruits.map((f, i) => {
+        const x = Math.cos(f.azimuth) * canopyR * 0.3;
+        const z = Math.sin(f.azimuth) * canopyR * 0.3;
+        return (
+          <group
+            key={`vf-${i}`}
+            position={[x, f.t * heightM, z]}
+            rotation={[0, f.azimuth, 0]}
+          >
+            <mesh
+              castShadow
+              scale={podShape === "long" ? [0.5, 1.6, 0.5] : [1, 1.4, 0.3]}
+            >
+              <cylinderGeometry args={[0.012, 0.012, f.length, 8]} />
+              <meshStandardMaterial color={fruitColor} roughness={0.45} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function RootBulbPlant({
+  id,
+  stage,
+  spec,
+  heightM,
+  canopyR,
+  bulbColor,
+  bladeColor,
+}: KindRenderProps & { bulbColor: string; bladeColor: string }) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0xa24b1f49)),
+    [id, stage],
+  );
+  const blades = useMemo(() => {
+    const out: { azimuth: number; bend: number; length: number }[] = [];
+    const count = Math.max(3, spec.leafCount);
+    for (let i = 0; i < count; i++) {
+      out.push({
+        azimuth: i * ((Math.PI * 2) / count) + rnd() * 0.3,
+        bend: 0.15 + rnd() * 0.3,
+        length: heightM * (0.7 + rnd() * 0.35),
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount, heightM]);
+  const bulbR =
+    canopyR *
+    (stage === 1 ? 0.25 : stage === 2 ? 0.45 : stage === 3 ? 0.75 : 1);
+  return (
+    <group>
+      <mesh position={[0, bulbR * 0.75, 0]} castShadow>
+        <sphereGeometry args={[bulbR, 14, 10]} />
+        <meshStandardMaterial color={bulbColor} roughness={0.8} />
+      </mesh>
+      {blades.map((b, i) => (
+        <group
+          key={`bl-${i}`}
+          position={[0, bulbR, 0]}
+          rotation={[b.bend, b.azimuth, 0]}
+        >
+          <mesh position={[0, b.length / 2, 0]} castShadow>
+            <cylinderGeometry args={[0.004, 0.008, b.length, 6]} />
+            <meshStandardMaterial color={bladeColor} roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function LeafRosettePlant({
+  id,
+  stage,
+  spec,
+  heightM,
+  canopyR,
+}: KindRenderProps) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x7f4a7c15)),
+    [id, stage],
+  );
+  const leaves = useMemo(() => {
+    const out: {
+      azimuth: number;
+      tilt: number;
+      scale: number;
+      layer: number;
+    }[] = [];
+    const layers = Math.min(3, Math.max(1, Math.ceil(spec.leafCount / 6)));
+    for (let i = 0; i < spec.leafCount; i++) {
+      const layer = i % layers;
+      out.push({
+        azimuth: rnd() * Math.PI * 2,
+        tilt: 0.9 - layer * 0.25 + rnd() * 0.15,
+        scale: (1 - layer * 0.2) * (0.8 + rnd() * 0.3),
+        layer,
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount]);
+  return (
+    <group>
+      {leaves.map((l, i) => (
+        <group
+          key={`ro-${i}`}
+          position={[0, heightM * (0.15 + l.layer * 0.25), 0]}
+          rotation={[0, l.azimuth, 0]}
+        >
+          <group rotation={[0, 0, -l.tilt]}>
+            <mesh
+              castShadow
+              position={[canopyR * 0.5, 0, 0]}
+              scale={[canopyR * 1.4 * l.scale, 0.015, canopyR * 0.9 * l.scale]}
+            >
+              <sphereGeometry args={[1, 10, 8]} />
+              <meshStandardMaterial color={LEAF_LIGHT} roughness={0.9} />
+            </mesh>
+          </group>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function BerryGroundPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+}: KindRenderProps) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x3b9aca07)),
+    [id, stage],
+  );
+  const leaves = useMemo(() => {
+    const out: { azimuth: number; scale: number }[] = [];
+    for (let i = 0; i < spec.leafCount; i++) {
+      out.push({ azimuth: rnd() * Math.PI * 2, scale: 0.7 + rnd() * 0.5 });
+    }
+    return out;
+  }, [rnd, spec.leafCount]);
+  const berries = useMemo(() => {
+    const out: { azimuth: number; r: number; ripe: boolean; size: number }[] =
+      [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      out.push({
+        azimuth: rnd() * Math.PI * 2,
+        r: canopyR * (0.2 + rnd() * 0.55),
+        ripe: rnd() < spec.ripeness,
+        size: 0.012 + rnd() * 0.006,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount, canopyR, spec.ripeness]);
+  return (
+    <group>
+      {leaves.map((l, i) => (
+        <group
+          key={`br-${i}`}
+          position={[0, heightM * 0.2, 0]}
+          rotation={[0, l.azimuth, 0]}
+        >
+          <group position={[canopyR * 0.45, 0, 0]} rotation={[0, 0, -1]}>
+            <Leaf scale={l.scale} />
+          </group>
+        </group>
+      ))}
+      {berries.map((b, i) => {
+        const x = Math.cos(b.azimuth) * b.r;
+        const z = Math.sin(b.azimuth) * b.r;
+        return (
+          <mesh
+            key={`be-${i}`}
+            position={[x, heightM * 0.35, z]}
+            castShadow
+            scale={[1, 1.2, 1]}
+          >
+            <sphereGeometry args={[b.size, 10, 8]} />
+            <meshStandardMaterial
+              color={b.ripe ? fruitColor : "#86efac"}
+              roughness={0.4}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function SprawlPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+}: KindRenderProps) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x5d588b65)),
+    [id, stage],
+  );
+  const leaves = useMemo(() => {
+    const out: { azimuth: number; r: number; scale: number }[] = [];
+    for (let i = 0; i < spec.leafCount; i++) {
+      out.push({
+        azimuth: rnd() * Math.PI * 2,
+        r: canopyR * (0.3 + rnd() * 0.65),
+        scale: 1.2 + rnd() * 0.6,
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount, canopyR]);
+  const pumpkins = useMemo(() => {
+    const out: { azimuth: number; r: number; size: number }[] = [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      out.push({
+        azimuth: rnd() * Math.PI * 2,
+        r: canopyR * (0.25 + rnd() * 0.5),
+        size: 0.06 + rnd() * 0.04,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount, canopyR]);
+  return (
+    <group>
+      {leaves.map((l, i) => {
+        const x = Math.cos(l.azimuth) * l.r;
+        const z = Math.sin(l.azimuth) * l.r;
+        return (
+          <group
+            key={`sl-${i}`}
+            position={[x, heightM * 0.25, z]}
+            rotation={[0, l.azimuth, 0]}
+          >
+            <Leaf scale={l.scale} />
+          </group>
+        );
+      })}
+      {pumpkins.map((p, i) => {
+        const x = Math.cos(p.azimuth) * p.r;
+        const z = Math.sin(p.azimuth) * p.r;
+        return (
+          <mesh
+            key={`pk-${i}`}
+            position={[x, p.size * 0.85, z]}
+            castShadow
+            scale={[1, 0.75, 1]}
+          >
+            <sphereGeometry args={[p.size, 14, 12]} />
+            <meshStandardMaterial color={fruitColor} roughness={0.5} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+interface KindDispatchProps {
+  plant: PlantItem;
+  stage: PlantStage;
+  spec: PlantStageSpec;
+  fruitColor: string;
+  heightM: number;
+  canopyR: number;
+}
+
+function KindDispatch({
+  plant,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+}: KindDispatchProps) {
+  const kindSpec = PLANT_KIND_SPECS[plant.kind];
+  const shared: KindRenderProps = {
+    id: plant.id,
+    stage,
+    spec,
+    fruitColor,
+    heightM,
+    canopyR,
+  };
+  switch (plant.kind) {
+    case "pepper-red":
+    case "pepper-green":
+    case "pepper-yellow":
+      return <BushyPlant {...shared} fruitShape="pepper" />;
+    case "eggplant":
+      return <BushyPlant {...shared} fruitShape="oval" />;
+    case "beans":
+    case "cucumber":
+      return <VineClimbPlant {...shared} podShape="long" />;
+    case "onion":
+    case "garlic":
+      return (
+        <RootBulbPlant
+          {...shared}
+          bulbColor={fruitColor}
+          bladeColor={kindSpec.foliageColor}
+        />
+      );
+    case "lettuce":
+      return <LeafRosettePlant {...shared} />;
+    case "strawberry":
+      return <BerryGroundPlant {...shared} />;
+    case "pumpkin":
+      return <SprawlPlant {...shared} />;
+    default:
+      return null;
+  }
+}
+
 interface PlantMeshProps {
   plant: PlantItem;
   selected: boolean;
 }
 
-function PlantMesh({ plant, selected }: PlantMeshProps) {
+function PlantMeshImpl({ plant, selected }: PlantMeshProps) {
   const select = usePlannerStore((s) => s.select);
+  const toggleSelection = usePlannerStore((s) => s.toggleSelection);
   const updatePlant = usePlannerStore((s) => s.updatePlant);
+  const translateItems = usePlannerStore((s) => s.translateItems);
   const setDragging = usePlannerStore((s) => s.setDragging);
+  const pauseHistory = usePlannerStore((s) => s.pauseHistory);
+  const commitHistory = usePlannerStore((s) => s.commitHistory);
   const beds = usePlannerStore((s) => s.beds);
+  const lockPlants = usePlannerStore((s) => s.lockPlants);
+  const isLocked = plant.locked === true || lockPlants;
 
+  const groupRef = useRef<Group>(null);
   const dragRef = useRef<{
     startPlant: PlantItem;
     startHit: { x: number; z: number };
+    multiIds?: string[];
+    lastDxCm: number;
+    lastDyCm: number;
+    lastX: number;
+    lastY: number;
   } | null>(null);
-  const { raycaster, pointer, camera } = useThree();
 
   const spec = PLANT_KIND_SPECS[plant.kind];
   const baseY = bedTopAtPoint(beds, plant.x, plant.y);
   const stage: PlantStage = plant.stage ?? DEFAULT_PLANT_STAGE;
+  const stageTable = PLANT_STAGE_SPECS[plant.kind];
+  const stageSpec = stageTable ? stageTable[stage] : undefined;
   const tomato = useMemo(
     () => (plant.kind === "tomato" ? buildTomato(plant.id, stage) : null),
     [plant.id, plant.kind, stage],
   );
-  const heightM = tomato ? tomato.heightM : spec.heightCm * CM_TO_M;
-  const canopyR = tomato ? tomato.canopyR : (spec.canopyCm / 2) * CM_TO_M;
-  const stemR = 0.012;
-  const outline = selected ? "#fb923c" : "#1f2937";
+  const heightM = tomato
+    ? tomato.heightM
+    : stageSpec
+      ? stageSpec.heightCm * CM_TO_M
+      : 0;
+  const canopyR = tomato
+    ? tomato.canopyR
+    : stageSpec
+      ? (stageSpec.canopyCm / 2) * CM_TO_M
+      : 0;
 
   const beginDrag = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    if (e.nativeEvent.shiftKey) {
+      toggleSelection(plant.id);
+      return;
+    }
     select(plant.id);
+    const s = usePlannerStore.getState();
+    if (s.lockPlants || plant.locked) return;
     const hit = intersectGround(e);
     if (!hit) return;
+    const ids = s.selectedIds.includes(plant.id) ? s.selectedIds : [plant.id];
     dragRef.current = {
       startPlant: { ...plant },
       startHit: { x: hit.x, z: hit.z },
+      multiIds: ids.length > 1 ? ids : undefined,
+      lastDxCm: 0,
+      lastDyCm: 0,
+      lastX: plant.x,
+      lastY: plant.y,
     };
+    pauseHistory();
     setDragging(true);
-  };
-
-  useFrame(() => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    raycaster.setFromCamera(pointer, camera);
-    const hit = new Vector3();
-    if (!raycaster.ray.intersectPlane(GROUND, hit)) return;
-    const dxM = hit.x - drag.startHit.x;
-    const dzM = hit.z - drag.startHit.z;
-    updatePlant(plant.id, {
-      x: drag.startPlant.x + dxM / CM_TO_M,
-      y: drag.startPlant.y + dzM / CM_TO_M,
+    setActiveDragTick(({ hit }) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const dxM = hit.x - drag.startHit.x;
+      const dzM = hit.z - drag.startHit.z;
+      const dxCm = dxM / CM_TO_M;
+      const dyCm = dzM / CM_TO_M;
+      if (drag.multiIds) {
+        const stepX = dxCm - drag.lastDxCm;
+        const stepY = dyCm - drag.lastDyCm;
+        drag.lastDxCm = dxCm;
+        drag.lastDyCm = dyCm;
+        if (stepX !== 0 || stepY !== 0) {
+          translateItems(drag.multiIds, stepX, stepY);
+        }
+        return;
+      }
+      const state = usePlannerStore.getState();
+      const clamped = clampPlantToPlot(
+        {
+          ...drag.startPlant,
+          x: drag.startPlant.x + dxCm,
+          y: drag.startPlant.y + dyCm,
+        },
+        state.plot,
+      );
+      drag.lastX = clamped.x;
+      drag.lastY = clamped.y;
+      if (groupRef.current) {
+        groupRef.current.position.x = clamped.x * CM_TO_M;
+        groupRef.current.position.z = clamped.y * CM_TO_M;
+        groupRef.current.position.y = bedTopAtPoint(
+          state.beds,
+          clamped.x,
+          clamped.y,
+        );
+      }
     });
-  });
+  };
 
   useEffect(() => {
     const up = () => {
-      if (!dragRef.current) return;
+      const drag = dragRef.current;
+      if (!drag) return;
+      const wasSingleMove = !drag.multiIds;
+      const finalX = drag.lastX;
+      const finalY = drag.lastY;
       dragRef.current = null;
+      setActiveDragTick(null);
       setDragging(false);
+      if (
+        wasSingleMove &&
+        (finalX !== drag.startPlant.x || finalY !== drag.startPlant.y)
+      ) {
+        updatePlant(plant.id, { x: finalX, y: finalY });
+      }
+      commitHistory();
     };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
-  }, [setDragging]);
+  }, [setDragging, commitHistory, updatePlant, plant.id]);
+
+  if (!spec || !stageSpec) return null;
 
   return (
     <group
+      ref={groupRef}
       position={[plant.x * CM_TO_M, baseY, plant.y * CM_TO_M]}
       onPointerDown={beginDrag}
     >
@@ -875,56 +1706,41 @@ function PlantMesh({ plant, selected }: PlantMeshProps) {
         <TomatoPlant
           structure={tomato}
           stage={stage}
-          hasStake={TOMATO_STAGE_SPECS[stage].hasStake}
+          hasStake={stageSpec.hasStake}
         />
       ) : (
-        <>
-          <mesh position={[0, heightM / 2, 0]} castShadow>
-            <cylinderGeometry args={[stemR, stemR, heightM, 8]} />
-            <meshStandardMaterial color={spec.stemColor} />
-          </mesh>
-          <mesh position={[0, heightM * 0.7, 0]} castShadow>
-            <sphereGeometry args={[canopyR, 16, 12]} />
-            <meshStandardMaterial color={spec.foliageColor} roughness={0.9} />
-            <Edges
-              threshold={1}
-              color={outline}
-              lineWidth={selected ? 2 : 0.5}
-            />
-          </mesh>
-          <mesh
-            position={[canopyR * 0.4, heightM * 0.65, canopyR * 0.2]}
-            castShadow
-          >
-            <sphereGeometry args={[canopyR * 0.22, 12, 10]} />
-            <meshStandardMaterial color={spec.fruitColor} />
-          </mesh>
-          <mesh
-            position={[-canopyR * 0.3, heightM * 0.8, -canopyR * 0.3]}
-            castShadow
-          >
-            <sphereGeometry args={[canopyR * 0.18, 12, 10]} />
-            <meshStandardMaterial color={spec.fruitColor} />
-          </mesh>
-        </>
+        <KindDispatch
+          plant={plant}
+          stage={stage}
+          spec={stageSpec}
+          fruitColor={spec.fruitColor}
+          heightM={heightM}
+          canopyR={canopyR}
+        />
       )}
       {selected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
           <ringGeometry args={[canopyR * 0.9, canopyR, 32]} />
-          <meshBasicMaterial color="#fb923c" transparent opacity={0.9} />
+          <meshBasicMaterial
+            color={isLocked ? "#fbbf24" : "#fb923c"}
+            transparent
+            opacity={0.9}
+          />
         </mesh>
       )}
     </group>
   );
 }
 
+const PlantMesh = memo(PlantMeshImpl);
+
 export function Plants() {
   const plants = usePlannerStore((s) => s.plants);
-  const selectedId = usePlannerStore((s) => s.selectedId);
+  const selectedIds = usePlannerStore((s) => s.selectedIds);
   return (
     <>
       {plants.map((p) => (
-        <PlantMesh key={p.id} plant={p} selected={p.id === selectedId} />
+        <PlantMesh key={p.id} plant={p} selected={selectedIds.includes(p.id)} />
       ))}
     </>
   );

@@ -4,71 +4,97 @@ import { useEffect, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Sky } from "@react-three/drei";
 import { PlannerCameras } from "./cameras";
-import { Beds, Ground, Irrigations, Lights, Plants, SceneGrid } from "./scene";
+import {
+  Beds,
+  DragController,
+  Ground,
+  Irrigations,
+  Lights,
+  Plants,
+  SceneGrid,
+  ShadowOptimizer,
+} from "./scene";
 import { PlannerToolbar } from "./toolbar";
 import { BedInspector } from "./bed-inspector";
 import { IrrigationInspector } from "./irrigation-inspector";
-import { isBedId, isIrrigationId, isPlantId, usePlannerStore } from "./store";
+import { PlantInspector } from "./plant-inspector";
+import { usePlannerStore } from "./store";
 
 export function GardenPlanner() {
-  const selectedId = usePlannerStore((s) => s.selectedId);
-  const removeBed = usePlannerStore((s) => s.removeBed);
-  const duplicateBed = usePlannerStore((s) => s.duplicateBed);
-  const removeIrrigation = usePlannerStore((s) => s.removeIrrigation);
-  const duplicateIrrigation = usePlannerStore((s) => s.duplicateIrrigation);
-  const removePlant = usePlannerStore((s) => s.removePlant);
-  const duplicatePlant = usePlannerStore((s) => s.duplicatePlant);
-  const select = usePlannerStore((s) => s.select);
-  const clipboardRef = useRef<string | null>(null);
+  const selectedIds = usePlannerStore((s) => s.selectedIds);
+  const removeSelected = usePlannerStore((s) => s.removeSelected);
+  const duplicateSelected = usePlannerStore((s) => s.duplicateSelected);
+  const toggleSelectedLocked = usePlannerStore((s) => s.toggleSelectedLocked);
+  const groupSelection = usePlannerStore((s) => s.groupSelection);
+  const ungroupSelection = usePlannerStore((s) => s.ungroupSelection);
+  const undo = usePlannerStore((s) => s.undo);
+  const redo = usePlannerStore((s) => s.redo);
+  const clearSelection = usePlannerStore((s) => s.clearSelection);
+  const clipboardRef = useRef<string[]>([]);
 
   useEffect(() => {
-    const duplicate = (id: string) => {
-      if (isBedId(id)) duplicateBed(id);
-      else if (isIrrigationId(id)) duplicateIrrigation(id);
-      else if (isPlantId(id)) duplicatePlant(id);
-    };
-    const remove = (id: string) => {
-      if (isBedId(id)) removeBed(id);
-      else if (isIrrigationId(id)) removeIrrigation(id);
-      else if (isPlantId(id)) removePlant(id);
-    };
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "c" && selectedId) {
-        clipboardRef.current = selectedId;
+      const key = e.key.toLowerCase();
+
+      if (mod && key === "z") {
+        if (e.shiftKey) redo();
+        else undo();
         e.preventDefault();
         return;
       }
-      if (mod && e.key.toLowerCase() === "v" && clipboardRef.current) {
-        duplicate(clipboardRef.current);
+      if (mod && key === "y") {
+        redo();
         e.preventDefault();
         return;
       }
-      if (mod && e.key.toLowerCase() === "d" && selectedId) {
-        duplicate(selectedId);
+      if (mod && key === "g") {
+        if (e.shiftKey) ungroupSelection();
+        else groupSelection();
         e.preventDefault();
         return;
       }
-      if (!selectedId) return;
+      if (mod && key === "l") {
+        toggleSelectedLocked();
+        e.preventDefault();
+        return;
+      }
+      if (mod && key === "c" && selectedIds.length > 0) {
+        clipboardRef.current = [...selectedIds];
+        e.preventDefault();
+        return;
+      }
+      if (mod && key === "v" && clipboardRef.current.length > 0) {
+        duplicateSelected();
+        e.preventDefault();
+        return;
+      }
+      if (mod && key === "d" && selectedIds.length > 0) {
+        duplicateSelected();
+        e.preventDefault();
+        return;
+      }
+      if (selectedIds.length === 0) return;
       if (e.key === "Delete" || e.key === "Backspace") {
-        remove(selectedId);
+        removeSelected();
       } else if (e.key === "Escape") {
-        select(null);
+        clearSelection();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    selectedId,
-    removeBed,
-    duplicateBed,
-    removeIrrigation,
-    duplicateIrrigation,
-    removePlant,
-    duplicatePlant,
-    select,
+    selectedIds,
+    removeSelected,
+    duplicateSelected,
+    toggleSelectedLocked,
+    groupSelection,
+    ungroupSelection,
+    undo,
+    redo,
+    clearSelection,
   ]);
 
   return (
@@ -86,9 +112,12 @@ export function GardenPlanner() {
           <Irrigations />
           <Plants />
           <PlannerCameras />
+          <DragController />
+          <ShadowOptimizer />
         </Canvas>
         <BedInspector />
         <IrrigationInspector />
+        <PlantInspector />
       </div>
     </div>
   );

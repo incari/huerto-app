@@ -1,6 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Lock, Unlock } from "lucide-react";
 import { NumberInput } from "./number-input";
 import { usePlannerStore } from "./store";
 import {
@@ -21,10 +23,20 @@ interface FieldProps {
   suffix?: string;
   min?: number;
   step?: number;
+  disabled?: boolean;
   onCommit: (v: number) => void;
 }
 
-function Field({ id, label, value, suffix, min, step, onCommit }: FieldProps) {
+function Field({
+  id,
+  label,
+  value,
+  suffix,
+  min,
+  step,
+  disabled,
+  onCommit,
+}: FieldProps) {
   return (
     <div className="flex flex-col gap-1">
       <Label
@@ -39,6 +51,7 @@ function Field({ id, label, value, suffix, min, step, onCommit }: FieldProps) {
           value={value}
           min={min}
           step={step}
+          disabled={disabled}
           onCommit={onCommit}
           className="h-8 w-20 pr-7"
         />
@@ -56,12 +69,15 @@ export function IrrigationInspector() {
   const irrigations = usePlannerStore((s) => s.irrigations);
   const selectedId = usePlannerStore((s) => s.selectedId);
   const updateIrrigation = usePlannerStore((s) => s.updateIrrigation);
+  const setIrrigationLocked = usePlannerStore((s) => s.setIrrigationLocked);
+  const lockIrrigations = usePlannerStore((s) => s.lockIrrigations);
   const mode = usePlannerStore((s) => s.mode);
 
   if (mode !== "design" || !selectedId) return null;
   const irr = irrigations.find((i) => i.id === selectedId);
   if (!irr) return null;
 
+  const locked = Boolean(irr.locked) || lockIrrigations;
   const patch = (p: Partial<Irrigation>) => updateIrrigation(irr.id, p);
   const linear = isLinearIrrigation(irr.kind);
   const isDrip = irr.kind === "drip";
@@ -71,10 +87,26 @@ export function IrrigationInspector() {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
       <div className="pointer-events-auto flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
-        <div className="flex items-center gap-1 pr-2 border-r border-border self-stretch">
+        <div className="flex items-center gap-2 pr-2 border-r border-border self-stretch">
           <span className="text-xs font-semibold">
             {IRRIGATION_LABELS[irr.kind]}
           </span>
+          <Button
+            size="icon"
+            variant={irr.locked ? "default" : "ghost"}
+            className="h-7 w-7"
+            aria-pressed={irr.locked ?? false}
+            aria-label={irr.locked ? "Desbloquear riego" : "Bloquear riego"}
+            title={irr.locked ? "Desbloquear riego" : "Bloquear riego"}
+            onClick={() => setIrrigationLocked(irr.id, !irr.locked)}
+            disabled={lockIrrigations && !irr.locked}
+          >
+            {irr.locked ? (
+              <Lock className="h-3.5 w-3.5" />
+            ) : (
+              <Unlock className="h-3.5 w-3.5" />
+            )}
+          </Button>
         </div>
         {linear ? (
           <>
@@ -85,6 +117,7 @@ export function IrrigationInspector() {
               suffix="cm"
               min={10}
               step={10}
+              disabled={locked}
               onCommit={(v) => patch({ lengthCm: Math.max(10, v) })}
             />
             <Field
@@ -94,6 +127,7 @@ export function IrrigationInspector() {
               suffix="cm"
               min={5}
               step={5}
+              disabled={locked}
               onCommit={(v) => patch({ widthCm: Math.max(5, v) })}
             />
             {isDrip && (
@@ -105,6 +139,7 @@ export function IrrigationInspector() {
                   suffix="cm"
                   min={5}
                   step={5}
+                  disabled={locked}
                   onCommit={(v) => patch({ spacingCm: Math.max(5, v) })}
                 />
                 <Field
@@ -114,6 +149,7 @@ export function IrrigationInspector() {
                   suffix="cm"
                   min={2}
                   step={1}
+                  disabled={locked}
                   onCommit={(v) => patch({ dropRadiusCm: Math.max(1, v / 2) })}
                 />
               </>
@@ -127,6 +163,7 @@ export function IrrigationInspector() {
             suffix="cm"
             min={10}
             step={10}
+            disabled={locked}
             onCommit={(v) => patch({ radiusCm: Math.max(10, v) })}
           />
         )}
@@ -137,6 +174,7 @@ export function IrrigationInspector() {
           value={irr.x}
           suffix="cm"
           step={1}
+          disabled={locked}
           onCommit={(v) => patch({ x: v })}
         />
         <Field
@@ -145,6 +183,7 @@ export function IrrigationInspector() {
           value={irr.y}
           suffix="cm"
           step={1}
+          disabled={locked}
           onCommit={(v) => patch({ y: v })}
         />
         {linear && (
@@ -154,6 +193,7 @@ export function IrrigationInspector() {
             value={irr.rotation * RAD_TO_DEG}
             suffix="°"
             step={5}
+            disabled={locked}
             onCommit={(v) => patch({ rotation: v * DEG_TO_RAD })}
           />
         )}

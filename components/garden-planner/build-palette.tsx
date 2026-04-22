@@ -2,18 +2,12 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SplitToolButton, SplitToolOption } from "./split-tool-button";
 import { usePlannerStore } from "./store";
 import { IRRIGATION_LABELS, IrrigationKind } from "./types";
 import {
   Box,
-  ChevronDown,
   CircleDot,
   Droplet,
   Droplets,
@@ -98,40 +92,24 @@ export function BuildPalette() {
               </Button>
             );
           })}
-          <div className="relative">
-            <Button
-              variant="outline"
-              onClick={() => addIrrigation(irrKind)}
-              className="h-auto w-full flex-col gap-1.5 py-3"
-            >
-              <IrrIcon className="h-5 w-5" />
-              <span className="text-xs">{IRRIGATION_LABELS[irrKind]}</span>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Cambiar tipo de riego"
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute top-1 right-1 h-5 w-5 text-muted-foreground hover:bg-accent"
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {IRRIGATION_ORDER.map((k) => {
-                  const KindIcon = IRRIGATION_ICONS[k];
-                  return (
-                    <DropdownMenuItem key={k} onSelect={() => setIrrKind(k)}>
-                      <KindIcon className="h-4 w-4" />
-                      {IRRIGATION_LABELS[k]}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <SplitToolButton<IrrigationKind>
+            label={IRRIGATION_LABELS[irrKind]}
+            icon={<IrrIcon className="h-5 w-5" />}
+            onActivate={() => addIrrigation(irrKind)}
+            options={IRRIGATION_ORDER.map<SplitToolOption<IrrigationKind>>(
+              (k) => {
+                const KindIcon = IRRIGATION_ICONS[k];
+                return {
+                  value: k,
+                  label: IRRIGATION_LABELS[k],
+                  icon: <KindIcon className="h-4 w-4" />,
+                };
+              },
+            )}
+            selected={irrKind}
+            onSelect={setIrrKind}
+            menuAriaLabel="Cambiar tipo de riego"
+          />
         </div>
       </ScrollArea>
       <div className="p-3 border-t border-border">

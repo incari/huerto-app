@@ -9,6 +9,7 @@ interface NumberInputProps {
   min?: number;
   step?: number;
   className?: string;
+  disabled?: boolean;
   onCommit: (v: number) => void;
 }
 
@@ -18,6 +19,7 @@ export function NumberInput({
   min,
   step,
   className,
+  disabled,
   onCommit,
 }: NumberInputProps) {
   const display = String(Math.round(value * 10) / 10);
@@ -48,6 +50,7 @@ export function NumberInput({
       min={min}
       step={step}
       className={className}
+      disabled={disabled}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -61,4 +64,3 @@ export function NumberInput({
     />
   );
 }
-
