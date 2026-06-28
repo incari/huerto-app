@@ -148,7 +148,7 @@ export default function GardenPlannerPage() {
           </div>
           <div>
             <h1 className="font-bold text-sm md:text-lg text-foreground">
-              Planificador de Huerto
+              Amreina{" "}
             </h1>
             <p className="text-xs text-muted-foreground hidden sm:block">
               Diseña tu huerto con líneas de goteo
