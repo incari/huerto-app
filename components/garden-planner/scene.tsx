@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import { Edges, Grid } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import {
+  CanvasTexture,
   Group,
   LatheGeometry,
   Plane,
@@ -27,7 +28,6 @@ import {
   PLANT_KIND_SPECS,
   PLANT_STAGE_SPECS,
   PlantItem,
-  PlantKind,
   PlantStage,
   PlantStageSpec,
   Plot,
@@ -1505,6 +1505,342 @@ function SprawlPlant({
   );
 }
 
+function HerbPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+}: KindRenderProps & { foliageColor?: string }) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x68e31da4)),
+    [id, stage],
+  );
+  const clumps = useMemo(() => {
+    const out: { x: number; y: number; z: number; scale: number }[] = [];
+    const count = Math.max(3, spec.leafCount);
+    for (let i = 0; i < count; i++) {
+      const r = canopyR * (0.15 + rnd() * 0.85);
+      const a = rnd() * Math.PI * 2;
+      out.push({
+        x: Math.cos(a) * r,
+        y: heightM * (0.2 + rnd() * 0.8),
+        z: Math.sin(a) * r,
+        scale: 0.6 + rnd() * 0.6,
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount, canopyR, heightM]);
+  const flowers = useMemo(() => {
+    const out: { x: number; y: number; z: number; size: number }[] = [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      const r = canopyR * (0.2 + rnd() * 0.65);
+      const a = rnd() * Math.PI * 2;
+      out.push({
+        x: Math.cos(a) * r,
+        y: heightM * (0.75 + rnd() * 0.25),
+        z: Math.sin(a) * r,
+        size: 0.008 + rnd() * 0.006,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount, canopyR, heightM]);
+  const stemR = 0.005 + stage * 0.0015;
+  return (
+    <group>
+      <mesh position={[0, heightM * 0.3, 0]} castShadow>
+        <cylinderGeometry args={[stemR * 0.6, stemR, heightM * 0.6, 6]} />
+        <meshStandardMaterial color={STEM_GREEN} roughness={0.9} />
+      </mesh>
+      {clumps.map((c, i) => (
+        <mesh
+          key={`hc-${i}`}
+          position={[c.x, c.y, c.z]}
+          castShadow
+          scale={[c.scale, c.scale * 0.8, c.scale]}
+        >
+          <sphereGeometry args={[0.03, 8, 6]} />
+          <meshStandardMaterial color={LEAF_LIGHT} roughness={0.9} />
+        </mesh>
+      ))}
+      {flowers.map((f, i) => (
+        <mesh key={`hf-${i}`} position={[f.x, f.y, f.z]} castShadow>
+          <sphereGeometry args={[f.size, 8, 6]} />
+          <meshStandardMaterial color={fruitColor} roughness={0.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function FlowerPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+}: KindRenderProps) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x27d4eb2d)),
+    [id, stage],
+  );
+  const stemR = 0.005 + stage * 0.0015;
+  const stems = useMemo(() => {
+    const count = Math.max(1, spec.branchCount);
+    const out: { azimuth: number; tilt: number; length: number }[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push({
+        azimuth: i * ((Math.PI * 2) / count) + rnd() * 0.4,
+        tilt: rnd() * 0.25,
+        length: heightM * (0.7 + rnd() * 0.3),
+      });
+    }
+    return out;
+  }, [rnd, spec.branchCount, heightM]);
+  const blooms = useMemo(() => {
+    const out: { stemIdx: number; size: number; color: string }[] = [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      out.push({
+        stemIdx: i % Math.max(1, spec.branchCount),
+        size: 0.022 + rnd() * 0.016,
+        color: fruitColor,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount, spec.branchCount, fruitColor]);
+  const leaves = useMemo(() => {
+    const out: { t: number; azimuth: number; scale: number }[] = [];
+    for (let i = 0; i < spec.leafCount; i++) {
+      out.push({
+        t: 0.15 + rnd() * 0.7,
+        azimuth: rnd() * Math.PI * 2,
+        scale: 0.7 + rnd() * 0.5,
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount]);
+  return (
+    <group>
+      {spec.hasStake && (
+        <mesh position={[-0.015, heightM * 0.52, 0]} castShadow>
+          <cylinderGeometry args={[0.005, 0.005, heightM * 1.04, 6]} />
+          <meshStandardMaterial color={STAKE_COLOR} roughness={0.95} />
+        </mesh>
+      )}
+      {stems.map((s, i) => (
+        <group key={`fs-${i}`} rotation={[0, s.azimuth, 0]}>
+          <group rotation={[0, 0, -s.tilt]}>
+            <mesh position={[0, s.length / 2, 0]} castShadow>
+              <cylinderGeometry args={[stemR * 0.7, stemR, s.length, 6]} />
+              <meshStandardMaterial color={STEM_GREEN} roughness={0.9} />
+            </mesh>
+          </group>
+        </group>
+      ))}
+      {leaves.map((l, i) => (
+        <group
+          key={`fl-${i}`}
+          position={[0, l.t * heightM, 0]}
+          rotation={[0, l.azimuth, 0]}
+        >
+          <group position={[canopyR * 0.25, 0, 0]} rotation={[0, 0, -0.8]}>
+            <Leaf scale={l.scale} />
+          </group>
+        </group>
+      ))}
+      {blooms.map((b, i) => {
+        const s = stems[b.stemIdx];
+        if (!s) return null;
+        const tip = s.length;
+        const x = Math.sin(s.tilt) * tip * Math.cos(s.azimuth);
+        const z = Math.sin(s.tilt) * tip * Math.sin(s.azimuth);
+        return (
+          <group key={`fb-${i}`} position={[x, tip, z]}>
+            <mesh castShadow>
+              <sphereGeometry args={[b.size, 12, 10]} />
+              <meshStandardMaterial color={b.color} roughness={0.45} />
+            </mesh>
+            <mesh position={[0, b.size * 0.45, 0]} castShadow>
+              <sphereGeometry args={[b.size * 0.35, 8, 6]} />
+              <meshStandardMaterial color="#fde047" roughness={0.6} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function HeadCropPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+  canopyR,
+  headShape = "dome",
+}: KindRenderProps & { headShape?: "dome" | "curd" | "sprouts" }) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x1b873593)),
+    [id, stage],
+  );
+  const leaves = useMemo(() => {
+    const out: { azimuth: number; tilt: number; scale: number }[] = [];
+    const count = Math.max(4, spec.leafCount);
+    for (let i = 0; i < count; i++) {
+      out.push({
+        azimuth: i * ((Math.PI * 2) / count) + rnd() * 0.3,
+        tilt: 0.75 + rnd() * 0.3,
+        scale: 0.9 + rnd() * 0.4,
+      });
+    }
+    return out;
+  }, [rnd, spec.leafCount]);
+  const headR = canopyR * 0.45;
+  const stalkR = 0.012 + stage * 0.003;
+  const sprouts = useMemo(() => {
+    if (headShape !== "sprouts") return [];
+    const out: { t: number; azimuth: number; size: number }[] = [];
+    for (let i = 0; i < spec.fruitCount; i++) {
+      out.push({
+        t: 0.15 + (i / Math.max(1, spec.fruitCount)) * 0.75,
+        azimuth: i * 1.7,
+        size: 0.018 + rnd() * 0.008,
+      });
+    }
+    return out;
+  }, [rnd, spec.fruitCount, headShape]);
+  return (
+    <group>
+      {headShape === "sprouts" && (
+        <mesh position={[0, heightM / 2, 0]} castShadow>
+          <cylinderGeometry args={[stalkR * 0.8, stalkR, heightM, 8]} />
+          <meshStandardMaterial color={STEM_GREEN} roughness={0.9} />
+        </mesh>
+      )}
+      {leaves.map((l, i) => (
+        <group
+          key={`hl-${i}`}
+          position={[0, heightM * (headShape === "sprouts" ? 0.95 : 0.2), 0]}
+          rotation={[0, l.azimuth, 0]}
+        >
+          <group rotation={[0, 0, -l.tilt]}>
+            <mesh
+              castShadow
+              position={[canopyR * 0.5, 0, 0]}
+              scale={[canopyR * 1.3 * l.scale, 0.018, canopyR * 0.95 * l.scale]}
+            >
+              <sphereGeometry args={[1, 10, 8]} />
+              <meshStandardMaterial color={LEAF_LIGHT} roughness={0.9} />
+            </mesh>
+          </group>
+        </group>
+      ))}
+      {headShape === "dome" && spec.fruitCount > 0 && (
+        <mesh position={[0, heightM * 0.55, 0]} castShadow>
+          <sphereGeometry args={[headR, 16, 12]} />
+          <meshStandardMaterial color={fruitColor} roughness={0.7} />
+        </mesh>
+      )}
+      {headShape === "curd" && spec.fruitCount > 0 && (
+        <group position={[0, heightM * 0.55, 0]}>
+          {Array.from({ length: 9 }).map((_, i) => {
+            const a = (i / 9) * Math.PI * 2;
+            const r = headR * 0.55;
+            return (
+              <mesh
+                key={`cu-${i}`}
+                position={[Math.cos(a) * r, 0, Math.sin(a) * r]}
+                castShadow
+              >
+                <sphereGeometry args={[headR * 0.45, 10, 8]} />
+                <meshStandardMaterial color={fruitColor} roughness={0.6} />
+              </mesh>
+            );
+          })}
+          <mesh castShadow>
+            <sphereGeometry args={[headR * 0.55, 12, 10]} />
+            <meshStandardMaterial color={fruitColor} roughness={0.6} />
+          </mesh>
+        </group>
+      )}
+      {sprouts.map((s, i) => (
+        <mesh
+          key={`sp-${i}`}
+          position={[
+            Math.cos(s.azimuth) * stalkR * 2,
+            s.t * heightM,
+            Math.sin(s.azimuth) * stalkR * 2,
+          ]}
+          castShadow
+        >
+          <sphereGeometry args={[s.size, 10, 8]} />
+          <meshStandardMaterial color={fruitColor} roughness={0.7} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function ShootClumpPlant({
+  id,
+  stage,
+  spec,
+  fruitColor,
+  heightM,
+}: KindRenderProps) {
+  const rnd = useMemo(
+    () => mulberry32(hashSeed(id) ^ (stage * 0x51afd7a9)),
+    [id, stage],
+  );
+  const shoots = useMemo(() => {
+    const count = Math.max(3, spec.branchCount + spec.leafCount);
+    const out: {
+      x: number;
+      z: number;
+      tilt: number;
+      azimuth: number;
+      length: number;
+      hasFlower: boolean;
+    }[] = [];
+    for (let i = 0; i < count; i++) {
+      const a = rnd() * Math.PI * 2;
+      const r = 0.01 + rnd() * 0.025;
+      out.push({
+        x: Math.cos(a) * r,
+        z: Math.sin(a) * r,
+        tilt: (rnd() - 0.5) * 0.2,
+        azimuth: rnd() * Math.PI * 2,
+        length: heightM * (0.7 + rnd() * 0.35),
+        hasFlower: i < spec.fruitCount,
+      });
+    }
+    return out;
+  }, [rnd, spec.branchCount, spec.leafCount, spec.fruitCount, heightM]);
+  return (
+    <group>
+      {shoots.map((s, i) => (
+        <group key={`sh-${i}`} position={[s.x, 0, s.z]}>
+          <group rotation={[s.tilt, s.azimuth, 0]}>
+            <mesh position={[0, s.length / 2, 0]} castShadow>
+              <cylinderGeometry args={[0.003, 0.005, s.length, 6]} />
+              <meshStandardMaterial color={STEM_GREEN} roughness={0.9} />
+            </mesh>
+            {s.hasFlower && (
+              <mesh position={[0, s.length + 0.012, 0]} castShadow>
+                <sphereGeometry args={[0.012, 10, 8]} />
+                <meshStandardMaterial color={fruitColor} roughness={0.5} />
+              </mesh>
+            )}
+          </group>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 interface KindDispatchProps {
   plant: PlantItem;
   stage: PlantStage;
@@ -1540,9 +1876,18 @@ function KindDispatch({
       return <BushyPlant {...shared} fruitShape="oval" />;
     case "beans":
     case "cucumber":
+    case "green-bean":
+    case "runner-bean":
+    case "red-bean":
+    case "fava-bean":
+    case "pea":
       return <VineClimbPlant {...shared} podShape="long" />;
     case "onion":
     case "garlic":
+    case "radish":
+    case "beet":
+    case "turnip":
+    case "carrot":
       return (
         <RootBulbPlant
           {...shared}
@@ -1550,15 +1895,105 @@ function KindDispatch({
           bladeColor={kindSpec.foliageColor}
         />
       );
+    case "leek":
+    case "chives":
+    case "asparagus":
+      return <ShootClumpPlant {...shared} />;
     case "lettuce":
+    case "spinach":
+    case "arugula":
+    case "escarole":
+    case "corn-salad":
+    case "endive":
+    case "chard":
+    case "celery":
+    case "fennel":
       return <LeafRosettePlant {...shared} />;
     case "strawberry":
       return <BerryGroundPlant {...shared} />;
     case "pumpkin":
+    case "watermelon":
+    case "melon":
+    case "zucchini":
       return <SprawlPlant {...shared} />;
+    case "potato":
+    case "lupin":
+    case "artichoke":
+      return <BushyPlant {...shared} fruitShape="sphere" />;
+    case "cabbage":
+    case "red-cabbage":
+      return <HeadCropPlant {...shared} headShape="dome" />;
+    case "broccoli":
+    case "romanesco":
+    case "cauliflower":
+      return <HeadCropPlant {...shared} headShape="curd" />;
+    case "brussels-sprouts":
+      return <HeadCropPlant {...shared} headShape="sprouts" />;
+    case "basil":
+    case "parsley":
+    case "rosemary":
+    case "dill":
+    case "sage":
+    case "oregano":
+    case "lemon-thyme":
+    case "stevia":
+    case "rue":
+      return <HerbPlant {...shared} />;
+    case "calendula":
+    case "nasturtium":
+    case "daisy":
+    case "rose":
+    case "altabaca":
+      return <FlowerPlant {...shared} />;
     default:
       return null;
   }
+}
+
+const emojiTextureCache = new Map<string, CanvasTexture>();
+
+function getEmojiTexture(emoji: string): CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  const cached = emojiTextureCache.get(emoji);
+  if (cached) return cached;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.clearRect(0, 0, size, size);
+  ctx.font =
+    "96px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(emoji, size / 2, size / 2 + 4);
+  const texture = new CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  emojiTextureCache.set(emoji, texture);
+  return texture;
+}
+
+function PlantEmoji2D({ emoji, sizeM }: { emoji: string; sizeM: number }) {
+  const texture = useMemo(() => getEmojiTexture(emoji), [emoji]);
+  if (!texture) return null;
+  return (
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0.01, 0]}
+      renderOrder={999}
+    >
+      <planeGeometry args={[sizeM, sizeM]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        depthWrite={false}
+        depthTest={false}
+        alphaTest={0.01}
+      />
+    </mesh>
+  );
 }
 
 interface PlantMeshProps {
@@ -1576,6 +2011,7 @@ function PlantMeshImpl({ plant, selected }: PlantMeshProps) {
   const commitHistory = usePlannerStore((s) => s.commitHistory);
   const beds = usePlannerStore((s) => s.beds);
   const lockPlants = usePlannerStore((s) => s.lockPlants);
+  const cameraMode = usePlannerStore((s) => s.camera);
   const isLocked = plant.locked === true || lockPlants;
 
   const groupRef = useRef<Group>(null);
@@ -1702,7 +2138,9 @@ function PlantMeshImpl({ plant, selected }: PlantMeshProps) {
       position={[plant.x * CM_TO_M, baseY, plant.y * CM_TO_M]}
       onPointerDown={beginDrag}
     >
-      {tomato ? (
+      {cameraMode === "2d" ? (
+        <PlantEmoji2D emoji={spec.emoji} sizeM={Math.max(canopyR * 2, 0.2)} />
+      ) : tomato ? (
         <TomatoPlant
           structure={tomato}
           stage={stage}

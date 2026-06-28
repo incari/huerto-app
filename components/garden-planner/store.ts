@@ -201,14 +201,32 @@ export function clampIrrigationToPlot(irr: Irrigation, plot: Plot): Irrigation {
   };
 }
 
-export function clampPlantToPlot(plant: PlantItem, plot: Plot): PlantItem {
-  const px = plot.widthCm / 2;
-  const pz = plot.depthCm / 2;
-  return {
-    ...plant,
-    x: Math.max(-px, Math.min(px, plant.x)),
-    y: Math.max(-pz, Math.min(pz, plant.y)),
-  };
+export function clampPlantToPlot(plant: PlantItem, _plot: Plot): PlantItem {
+  return plant;
+}
+
+function findFreePlantPosition(
+  kind: PlantKind,
+  plants: PlantItem[],
+  plot: Plot,
+): { x: number; y: number } {
+  const newR = PLANT_KIND_SPECS[kind].canopyCm / 2;
+  const pad = 10;
+  const stagingX = plot.widthCm / 2 + newR + pad;
+  const step = Math.max(30, newR * 2 + pad);
+  const overlaps = (x: number, y: number) =>
+    plants.some((p) => {
+      const r = PLANT_KIND_SPECS[p.kind].canopyCm / 2;
+      return Math.hypot(p.x - x, p.y - y) < r + newR + pad;
+    });
+  for (let col = 0; col < 40; col++) {
+    const x = stagingX + col * step;
+    for (let row = 0; row < 80; row++) {
+      const y = row % 2 === 0 ? (row / 2) * step : -((row + 1) / 2) * step;
+      if (!overlaps(x, y)) return { x, y };
+    }
+  }
+  return { x: stagingX, y: 0 };
 }
 
 export const usePlannerStore = create<PlannerStore>()(
@@ -371,8 +389,9 @@ export const usePlannerStore = create<PlannerStore>()(
           set((s) => {
             if (s.lockPlants) return s;
             const id = newId("plant");
+            const pos = findFreePlantPosition(kind, s.plants, s.plot);
             const plant = clampPlantToPlot(
-              { id, kind, x: 0, y: 0, stage },
+              { id, kind, x: pos.x, y: pos.y, stage },
               s.plot,
             );
             return {
